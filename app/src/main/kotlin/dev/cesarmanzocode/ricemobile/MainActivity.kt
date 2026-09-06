@@ -47,6 +47,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        (application as RiceApplication).container.appsRepository.start()
+    }
+
+    override fun onStop() {
+        (application as RiceApplication).container.appsRepository.stop()
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         refreshHomeRole()
