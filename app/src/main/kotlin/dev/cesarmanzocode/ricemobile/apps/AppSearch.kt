@@ -22,11 +22,10 @@ object AppSearch {
 
     fun order(entries: List<AppEntry>, locale: Locale = Locale.getDefault()): List<AppEntry> {
         val collator = Collator.getInstance(locale)
-        return entries.sortedWith(
-            compareBy(collator) { it.label }
-                .thenBy { it.key.component }
-                .thenBy { it.key.userSerial }
-        )
+        val comparator = Comparator<AppEntry> { a, b -> collator.compare(a.label, b.label) }
+            .thenBy { it.key.component }
+            .thenBy { it.key.userSerial }
+        return entries.sortedWith(comparator)
     }
 
     fun clampQuery(query: String): String = query.take(MAX_QUERY_LENGTH)
