@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">rice-mobile</string>
+    <string name="action_use_as_home">Usar como inicio</string>
+    <string name="action_open_drawer">APPS ↑</string>
+    <string name="search_hint">Buscar apps</string>
+    <string name="catalog_loading">Cargando catálogo…</string>
+    <string name="catalog_empty">Sin resultados</string>
+    <string name="catalog_error">No se pudo actualizar</string>
+    <string name="action_retry">Reintentar</string>
+</resources>
