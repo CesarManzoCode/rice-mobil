@@ -31,16 +31,20 @@ object AppSearch {
 
     fun clampQuery(query: String): String = query.take(MAX_QUERY_LENGTH)
 
+    /** Empty query means "no filtering": callers should show [ordered] unchanged. */
+    fun tokensOf(query: String): List<String> {
+        val normalizedQuery = normalize(query)
+        if (normalizedQuery.isEmpty()) return emptyList()
+        return normalizedQuery.split(" ").filter { it.isNotEmpty() }
+    }
+
+    fun matches(entry: AppEntry, tokens: List<String>): Boolean =
+        tokens.all { token -> entry.normalizedLabel.contains(token) || entry.normalizedPackage.contains(token) }
+
     /** Empty query returns [ordered] unchanged; otherwise every token must match as a substring. */
     fun filter(ordered: List<AppEntry>, query: String): List<AppEntry> {
-        val normalizedQuery = normalize(query)
-        if (normalizedQuery.isEmpty()) return ordered
-        val tokens = normalizedQuery.split(" ").filter { it.isNotEmpty() }
+        val tokens = tokensOf(query)
         if (tokens.isEmpty()) return ordered
-        return ordered.filter { entry ->
-            tokens.all { token ->
-                entry.normalizedLabel.contains(token) || entry.normalizedPackage.contains(token)
-            }
-        }
+        return ordered.filter { entry -> matches(entry, tokens) }
     }
 }

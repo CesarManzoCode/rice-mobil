@@ -9,28 +9,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import dev.cesarmanzocode.ricemobile.launcher.LauncherHost
+import dev.cesarmanzocode.ricemobile.launcher.LauncherViewModel
+import dev.cesarmanzocode.ricemobile.launcher.LauncherViewModelFactory
 
 class MainActivity : ComponentActivity() {
 
+    private val container: AppContainer get() = (application as RiceApplication).container
+
     private val roleManager: RoleManager by lazy { getSystemService(RoleManager::class.java) }
 
-    private var isDefaultHome by mutableStateOf(false)
+    private val viewModel: LauncherViewModel by viewModels {
+        LauncherViewModelFactory(container.appsRepository, container.appLauncher)
+    }
 
     private val requestHome = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -39,32 +35,53 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleHomeIntent(intent)
         setContent {
-            RiceMobileBootstrap(
-                isDefaultHome = isDefaultHome,
-                onRequestHome = ::requestDefaultHome,
-            )
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    LauncherHost(
+                        viewModel = viewModel,
+                        iconLoader = container.iconLoader,
+                        onRequestHomeRole = ::requestDefaultHome,
+                    )
+                }
+            }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleHomeIntent(intent)
     }
 
     override fun onStart() {
         super.onStart()
-        (application as RiceApplication).container.appsRepository.start()
+        container.appsRepository.start()
     }
 
     override fun onStop() {
-        (application as RiceApplication).container.appsRepository.stop()
+        container.appsRepository.stop()
         super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
         refreshHomeRole()
+        viewModel.onActivityResumed()
+    }
+
+    /** Contract §3.5: a Home intent resets navigation even if it repeats. */
+    private fun handleHomeIntent(intent: Intent) {
+        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) {
+            viewModel.resetToHome()
+        }
     }
 
     private fun refreshHomeRole() {
-        isDefaultHome = roleManager.isRoleAvailable(RoleManager.ROLE_HOME) &&
+        val isDefaultHome = roleManager.isRoleAvailable(RoleManager.ROLE_HOME) &&
             roleManager.isRoleHeld(RoleManager.ROLE_HOME)
+        viewModel.updateHomeRoleStatus(isDefaultHome)
     }
 
     private fun requestDefaultHome() {
@@ -77,27 +94,6 @@ class MainActivity : ComponentActivity() {
                 startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
             } catch (_: ActivityNotFoundException) {
                 startActivity(Intent(Settings.ACTION_SETTINGS))
-            }
-        }
-    }
-}
-
-@Composable
-private fun RiceMobileBootstrap(isDefaultHome: Boolean, onRequestHome: () -> Unit) {
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(text = "rice-mobile")
-                    if (!isDefaultHome) {
-                        Button(onClick = onRequestHome) {
-                            Text(text = stringResource(R.string.action_use_as_home))
-                        }
-                    }
-                }
             }
         }
     }

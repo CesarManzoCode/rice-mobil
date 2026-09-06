@@ -3,6 +3,7 @@ package dev.cesarmanzocode.ricemobile
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.os.UserManager
+import dev.cesarmanzocode.ricemobile.apps.AppLauncher
 import dev.cesarmanzocode.ricemobile.apps.AppsRepository
 import dev.cesarmanzocode.ricemobile.apps.IconLoader
 import kotlinx.coroutines.CoroutineScope
@@ -38,4 +39,6 @@ class AppContainer(applicationContext: Context) {
     )
 
     val iconLoader = IconLoader(launcherApps, maxCacheBytes = MAX_ICON_CACHE_BYTES)
+
+    val appLauncher = AppLauncher(launcherApps, userManager)
 }
