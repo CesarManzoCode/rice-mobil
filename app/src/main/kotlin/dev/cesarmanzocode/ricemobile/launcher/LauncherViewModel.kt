@@ -78,11 +78,11 @@ class LauncherViewModel(
     }
 
     fun openDrawer() {
-        transient.update { it.copy(screen = LauncherScreen.Drawer) }
+        transient.update(LauncherNavigation::openDrawer)
     }
 
     fun goHome() {
-        transient.update { it.copy(screen = LauncherScreen.Home, query = "", message = null) }
+        transient.update(LauncherNavigation::goHome)
     }
 
     fun retryCatalog() {
@@ -106,18 +106,18 @@ class LauncherViewModel(
                 goHome()
             }
             LaunchResult.Unavailable -> {
-                transient.update { it.copy(message = UiMessage(System.nanoTime(), UiMessageType.AppLaunchFailed)) }
+                transient.update { LauncherNavigation.launchFailed(it, System.nanoTime()) }
                 repository.requestRefresh()
             }
             LaunchResult.Denied -> {
-                transient.update { it.copy(message = UiMessage(System.nanoTime(), UiMessageType.AppLaunchFailed)) }
+                transient.update { LauncherNavigation.launchFailed(it, System.nanoTime()) }
             }
         }
     }
 
     /** Contract §3.5/§7: a Home intent clears drawer/query/menu immediately, unconditionally. */
     fun resetToHome() {
-        transient.update { TransientState(screen = LauncherScreen.Home, isDefaultHome = it.isDefaultHome) }
+        transient.update(LauncherNavigation::resetToHome)
     }
 }
 

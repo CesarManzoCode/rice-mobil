@@ -30,16 +30,14 @@ fun LauncherHost(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    // Back precedence (contract §7): IME first, then Drawer -> Home, then Home no-op only
-    // while this app actually holds the Home role.
-    BackHandler(enabled = state.screen == LauncherScreen.Drawer && imeVisible) {
+    BackHandler(enabled = LauncherNavigation.imeBackHandlerEnabled(state.screen, imeVisible)) {
         keyboardController?.hide()
         focusManager.clearFocus()
     }
-    BackHandler(enabled = state.screen == LauncherScreen.Drawer && !imeVisible) {
+    BackHandler(enabled = LauncherNavigation.drawerBackHandlerEnabled(state.screen, imeVisible)) {
         viewModel.goHome()
     }
-    BackHandler(enabled = state.screen == LauncherScreen.Home && state.isDefaultHome) {
+    BackHandler(enabled = LauncherNavigation.homeNoOpBackHandlerEnabled(state.screen, state.isDefaultHome)) {
         // No-op: a default Home never exits to a previous Home.
     }
 
