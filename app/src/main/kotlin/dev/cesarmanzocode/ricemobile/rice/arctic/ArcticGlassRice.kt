@@ -10,16 +10,18 @@ import dev.cesarmanzocode.ricemobile.rice.RiceId
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperSpec
 
-/** Structure: Home is a floating horizontal dock; Drawer is a grid inside a panel. */
+/** Floating dock (contract §18.3): a light centered clock in the upper half, wide empty air, and
+ * a floating horizontal glass dock near the thumb. Drawer is a nearly-full rounded panel with a
+ * grid inside. Glass V1 = translucency + border + short shadow, never a real backdrop blur. */
 object ArcticGlassRice : Rice {
     override val id = RiceId.ArcticGlass
     override val wallpaper = WallpaperSpec(
-        assetPath = "wallpapers/arctic_glass.png",
-        assetRevision = 1,
-        fallbackColorArgb = 0xFFD8E6EEL,
+        assetPath = "wallpapers/arctic_glass.webp",
+        assetRevision = 2,
+        fallbackColorArgb = 0xFF071B2AL,
     )
-    override val motion = RiceMotion(drawerEnterMs = 280, drawerExitMs = 220)
-    override val lightSystemBars = true
+    override val motion = RiceMotion.Arctic
+    override val lightSystemBars = false
 
     @Composable
     override fun Home(model: HomeModel, actions: RiceActions, modifier: Modifier) {
