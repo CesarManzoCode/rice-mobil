@@ -10,15 +10,16 @@ import dev.cesarmanzocode.ricemobile.rice.RiceId
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperSpec
 
-/** Structure (contract prompt): vertical composition, favorites as a linear list; single-list drawer. */
+/** Austere typographic block (contract §18.2): rigid start-aligned column, an oversized clock,
+ * favorites as a linear list, a single-list drawer with rules. No dock, no cards, no color. */
 object MonochromeRice : Rice {
     override val id = RiceId.Monochrome
     override val wallpaper = WallpaperSpec(
-        assetPath = "wallpapers/monochrome.png",
-        assetRevision = 1,
+        assetPath = "wallpapers/monochrome.webp",
+        assetRevision = 2,
         fallbackColorArgb = 0xFF0A0A0AL,
     )
-    override val motion = RiceMotion(drawerEnterMs = 140, drawerExitMs = 110)
+    override val motion = RiceMotion.Monochrome
     override val lightSystemBars = false
 
     @Composable

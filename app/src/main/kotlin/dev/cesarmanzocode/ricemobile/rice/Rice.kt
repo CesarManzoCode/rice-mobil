@@ -1,7 +1,13 @@
 package dev.cesarmanzocode.ricemobile.rice
 
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.apps.AppKey
 import dev.cesarmanzocode.ricemobile.apps.CatalogStatus
@@ -44,15 +50,81 @@ data class RiceActions(
     val retryCatalog: () -> Unit,
 )
 
+/** How a route (Drawer/Picker) enters relative to its final position (contract §10). */
+sealed interface MotionDisplacement {
+    /** A fixed offset, independent of the container's measured size. */
+    data class Fixed(val distance: Dp) : MotionDisplacement
+
+    /** A fraction of the container's height, used only by Violet's sheet (§18.6: ".12 de altura"). */
+    data class HeightFraction(val fraction: Float) : MotionDisplacement
+}
+
 /**
- * Enter/exit timings from contract §10. S2 only carries these numbers on the interface;
- * the host does not yet drive `AnimatedContent`/`PredictiveBackHandler` from them (that
- * wiring, and the rest of §10's easing/press detail, is Sprint 3 polish).
+ * Full §10 motion contract per rice: enter/exit duration+easing, displacement, and the press
+ * feedback (scale + duration) every interactive cell in that rice uses. The host drives
+ * route/rice transitions from this (contract §16 task 7); presses are applied locally by each
+ * rice via [dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale] so the *values* are
+ * shared, never a shared visual widget.
  */
 data class RiceMotion(
-    val drawerEnterMs: Int,
-    val drawerExitMs: Int,
-)
+    val enterMs: Int,
+    val exitMs: Int,
+    val enterEasing: Easing,
+    val exitEasing: Easing,
+    val displacement: MotionDisplacement,
+    val pressScale: Float,
+    val pressMs: Int,
+) {
+    /** Contract §10 table, one instance per rice; kept in this shared file since the *values*
+     * are normative, even though each rice applies them to its own geometry. */
+    companion object {
+        val Monochrome = RiceMotion(
+            enterMs = 140,
+            exitMs = 110,
+            enterEasing = LinearOutSlowInEasing,
+            exitEasing = LinearOutSlowInEasing,
+            displacement = MotionDisplacement.Fixed(12.dp),
+            pressScale = 0.98f,
+            pressMs = 70,
+        )
+        val Arctic = RiceMotion(
+            enterMs = 280,
+            exitMs = 220,
+            enterEasing = FastOutSlowInEasing,
+            exitEasing = FastOutSlowInEasing,
+            displacement = MotionDisplacement.Fixed(28.dp),
+            pressScale = 0.96f,
+            pressMs = 100,
+        )
+        val Ember = RiceMotion(
+            enterMs = 170,
+            exitMs = 140,
+            enterEasing = FastOutSlowInEasing,
+            exitEasing = FastOutLinearInEasing,
+            displacement = MotionDisplacement.Fixed(18.dp),
+            pressScale = 0.98f,
+            pressMs = 70,
+        )
+        val Ivory = RiceMotion(
+            enterMs = 200,
+            exitMs = 160,
+            enterEasing = FastOutSlowInEasing,
+            exitEasing = FastOutSlowInEasing,
+            displacement = MotionDisplacement.Fixed(8.dp),
+            pressScale = 1f, // Ivory's press is a tint/background change, not a scale (§10).
+            pressMs = 90,
+        )
+        val Violet = RiceMotion(
+            enterMs = 340,
+            exitMs = 260,
+            enterEasing = FastOutSlowInEasing,
+            exitEasing = FastOutSlowInEasing,
+            displacement = MotionDisplacement.HeightFraction(0.12f),
+            pressScale = 0.96f,
+            pressMs = 110,
+        )
+    }
+}
 
 /**
  * Contract §6.1. Five real implementations; no `BaseRiceHome`. Each rice owns its full

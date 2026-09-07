@@ -21,4 +21,16 @@
     <string name="rice_name_violet_night">Violet Night</string>
     <string name="wallpaper_failed">No se pudo cambiar el fondo</string>
     <string name="preferences_unavailable">No se pudieron leer las preferencias</string>
+    <string name="favorite_marked_hint">Favorita</string>
+    <string name="drawer_title">APPS</string>
+    <string name="drawer_library_title">Biblioteca de apps</string>
+    <string name="ivory_edition_action">Edición</string>
+    <string name="arctic_explore_hint">Apps</string>
+    <string name="violet_explore_hint">Explorar</string>
+    <string name="close_drawer">Cerrar</string>
+    <string name="ember_all_apps">TODAS LAS APPS</string>
+    <plurals name="catalog_result_count">
+        <item quantity="one">%d resultado</item>
+        <item quantity="other">%d resultados</item>
+    </plurals>
 </resources>
