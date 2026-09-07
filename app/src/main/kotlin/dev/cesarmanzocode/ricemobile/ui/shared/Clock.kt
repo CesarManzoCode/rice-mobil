@@ -4,6 +4,8 @@ import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import java.time.Instant
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -42,3 +44,10 @@ fun formatClockAmPm(now: ZonedDateTime, locale: Locale): String =
 
 fun formatClockDate(now: ZonedDateTime, locale: Locale, style: FormatStyle = FormatStyle.FULL): String =
     now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(style).withLocale(locale))
+
+/** Same "14:07"/"2:07" shape as [formatClockTime], for an arbitrary instant (contract-compatible
+ * use: the next alarm's real trigger time, never "now"). */
+fun formatEpochTime(epochMillis: Long, is24Hour: Boolean, locale: Locale): String {
+    val at = ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault())
+    return formatClockTime(at, is24Hour, locale)
+}

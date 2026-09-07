@@ -191,7 +191,11 @@ fun LauncherHost(
                 val rice = RiceRegistry.of(key.riceId)
                 when (key.screen) {
                     LauncherScreen.Home -> rice.Home(
-                        model = HomeModel(favorites = viewModel.favoriteSlots(state), isDefaultHome = state.isDefaultHome),
+                        model = HomeModel(
+                            favorites = viewModel.favoriteSlots(state),
+                            isDefaultHome = state.isDefaultHome,
+                            recentApps = state.recentApps,
+                        ),
                         actions = actions,
                     )
                     LauncherScreen.Drawer -> rice.Drawer(
@@ -200,6 +204,7 @@ fun LauncherHost(
                             results = state.results,
                             favoriteKeys = state.favoriteKeys.toSet(),
                             status = state.catalogStatus,
+                            recentApps = state.recentApps,
                         ),
                         actions = actions,
                     )

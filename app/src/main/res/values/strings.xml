@@ -33,4 +33,30 @@
         <item quantity="one">%d resultado</item>
         <item quantity="other">%d resultados</item>
     </plurals>
+
+    <!-- Local hierarchy: recents + categories (Sprint 3 second pass) -->
+    <string name="category_communication">Comunicación</string>
+    <string name="category_productivity">Productividad</string>
+    <string name="category_multimedia">Multimedia</string>
+    <string name="category_news">Noticias</string>
+    <string name="category_maps_travel">Mapas y viajes</string>
+    <string name="category_games">Juegos</string>
+    <string name="category_tools">Herramientas</string>
+    <string name="category_other">Otros</string>
+    <string name="drawer_section_recent">Recientes</string>
+    <string name="drawer_section_categories">Categorías</string>
+    <string name="drawer_section_all_apps">Todas las apps</string>
+    <string name="drawer_back">Atrás</string>
+    <string name="drawer_no_recents">Aún no hay apps recientes</string>
+    <plurals name="category_app_count">
+        <item quantity="one">%d app</item>
+        <item quantity="other">%d apps</item>
+    </plurals>
+
+    <!-- Native Home modules: real device data only, never fabricated -->
+    <string name="battery_label">Batería</string>
+    <string name="battery_charging">Cargando</string>
+    <string name="next_alarm_label">Próxima alarma</string>
+    <string name="next_alarm_none">Sin alarma</string>
+    <string name="home_recent_title">Recientes</string>
 </resources>

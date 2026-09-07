@@ -81,6 +81,9 @@ class LauncherViewModel(
         val prefs = prefsSnapshot.preferences
         val appsByKey = catalog.apps.associateBy { it.key }
         val favorites = prefs.favorites.mapNotNull { appsByKey[it] }
+        // Recents are a convenience shortcut, not a persisted identity contract: an uninstalled
+        // recent simply drops out (never rendered as an "unavailable" slot like a favorite).
+        val recentApps = prefs.recentApps.mapNotNull { appsByKey[it] }
         return LauncherState(
             preferencesReady = true, // this reducer only runs once the preferences flow emitted.
             rice = prefs.rice,
@@ -91,6 +94,7 @@ class LauncherViewModel(
             results = results,
             favoriteKeys = prefs.favorites,
             favorites = favorites,
+            recentApps = recentApps,
             appMenu = transientValue.appMenu,
             isDefaultHome = transientValue.isDefaultHome,
             preferencesWritable = prefsSnapshot is PreferencesSnapshot.Ready,
@@ -160,6 +164,9 @@ class LauncherViewModel(
         when (launcher.launch(key)) {
             LaunchResult.Started -> {
                 launchInFlight = true
+                // Fire-and-forget: recording local history never delays returning Home or the
+                // launch itself (contract §3.5 "no retrasar apertura por una animación").
+                viewModelScope.launch { preferencesRepository.recordAppOpened(key) }
                 goHome()
             }
             LaunchResult.Unavailable -> {

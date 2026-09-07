@@ -30,6 +30,9 @@ fun buildFavoriteSlots(favoriteKeys: List<AppKey>, apps: List<AppEntry>): List<F
 data class HomeModel(
     val favorites: List<FavoriteSlot>,
     val isDefaultHome: Boolean,
+    /** Most-recent-first, this launcher's own local history only (never Android UsageStats).
+     * Already capped/deduped upstream; a rice shows as many as its layout wants, or none. */
+    val recentApps: List<AppEntry> = emptyList(),
 )
 
 data class DrawerModel(
@@ -37,6 +40,8 @@ data class DrawerModel(
     val results: List<AppEntry>,
     val favoriteKeys: Set<AppKey>,
     val status: CatalogStatus,
+    /** Same local history as [HomeModel.recentApps]; a Drawer's "Recientes" section. */
+    val recentApps: List<AppEntry> = emptyList(),
 )
 
 data class RiceActions(

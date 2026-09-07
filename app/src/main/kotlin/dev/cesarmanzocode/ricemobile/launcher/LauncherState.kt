@@ -41,6 +41,7 @@ data class LauncherState(
     val results: List<AppEntry> = emptyList(),
     val favoriteKeys: List<AppKey> = emptyList(),
     val favorites: List<AppEntry> = emptyList(),
+    val recentApps: List<AppEntry> = emptyList(),
     val appMenu: AppKey? = null,
     val isDefaultHome: Boolean = false,
     val preferencesWritable: Boolean = true,
