@@ -3,46 +3,67 @@ package dev.cesarmanzocode.ricemobile.rice.arctic
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items as columnItems
+import androidx.compose.foundation.lazy.items as listItems
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,12 +82,15 @@ import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
+import kotlinx.coroutines.launch
 
 /**
- * Arctic Drawer (approved mockup, Sprint 3 second pass): search now lives at the *top* of the
- * glass panel (matching the mockup, unlike every other rice's bottom search), followed by a
- * horizontal chip row, Recientes, a Categorías tile grid, and a structured "Todas las apps"
- * destination — instead of a bare 4-column grid of every app from the first frame.
+ * Arctic Drawer V2 (Sprint 3, mockup reconstruction): edge-to-edge (no floating rounded card —
+ * the mockup's drawer is a flat full-bleed panel, unlike Home's floating modules), search on top,
+ * a fully-scrolling chip row, Recientes, a *separate* Favoritos row (the mockup's "Frecuentes"
+ * without UsageStats), a denser 2-column Categorías grid with real glyphs, and a "Todas las apps"
+ * preview card that shows real apps instead of ending on a bare button. The full A-Z destination
+ * is a structured, letter-headered list with a tappable rail — not a repeat of the search grid.
  */
 @Composable
 fun ArcticDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = Modifier) {
@@ -74,60 +98,87 @@ fun ArcticDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = 
     val searching = model.query.isNotEmpty()
     BackHandler(enabled = !searching && view != DrawerView.Browse) { view = DrawerView.Browse }
 
-    Box(modifier = modifier.fillMaxSize().background(ARCTIC_BACKGROUND).safeDrawingPadding().padding(12.dp)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .shadow(8.dp, RoundedCornerShape(28.dp), clip = false)
-                .clip(RoundedCornerShape(28.dp))
-                .background(ARCTIC_GLASS)
-                .border(1.dp, ARCTIC_BORDER, RoundedCornerShape(28.dp))
-                .padding(16.dp),
-        ) {
-            ArcticSearchField(
-                query = model.query,
-                onQueryChange = actions.updateQuery,
-                resultCount = model.results.size,
-                onSearchSingleResult = { model.results.singleOrNull()?.let { actions.openApp(it.key) } },
-                modifier = Modifier.fillMaxWidth(),
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ARCTIC_BACKGROUND)
+            .safeDrawingPadding()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        ArcticSearchField(
+            query = model.query,
+            onQueryChange = actions.updateQuery,
+            resultCount = model.results.size,
+            onSearchSingleResult = { model.results.singleOrNull()?.let { actions.openApp(it.key) } },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        val pushed = !searching && view != DrawerView.Browse
+        if (pushed) {
+            DrawerSubHeader(
+                title = when (val v = view) {
+                    is DrawerView.Category -> stringResource(v.category.labelRes)
+                    else -> stringResource(R.string.drawer_section_all_apps)
+                },
+                onBack = { view = DrawerView.Browse },
             )
-            Spacer(modifier = Modifier.padding(top = 12.dp))
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                when (model.status) {
-                    CatalogStatus.Loading -> EmptyState(message = stringResource(R.string.catalog_loading), textColor = ARCTIC_SECONDARY)
-                    is CatalogStatus.Failed -> EmptyState(
-                        message = stringResource(R.string.catalog_error),
-                        textColor = ARCTIC_SECONDARY,
-                        accentColor = ARCTIC_ACCENT,
-                        actionLabel = stringResource(R.string.action_retry),
-                        onAction = actions.retryCatalog,
-                    )
-                    CatalogStatus.Ready -> {
-                        if (model.results.isEmpty()) {
-                            EmptyState(message = stringResource(R.string.catalog_empty), textColor = ARCTIC_SECONDARY)
-                        } else if (searching) {
-                            AppGrid(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
-                        } else {
-                            Crossfade(targetState = view, animationSpec = tween(150), label = "arctic-drawer-view") { target ->
-                                when (target) {
-                                    DrawerView.Browse -> BrowseView(
-                                        model = model,
-                                        onOpenCategory = { view = DrawerView.Category(it) },
-                                        onOpenAllApps = { view = DrawerView.AllApps },
-                                        actions = actions,
-                                    )
-                                    is DrawerView.Category -> {
-                                        val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == target.category }
-                                        AppGrid(entries = group?.apps.orEmpty(), favoriteKeys = model.favoriteKeys, actions = actions)
-                                    }
-                                    DrawerView.AllApps -> AppGrid(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
+        } else {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when (model.status) {
+                CatalogStatus.Loading -> EmptyState(message = stringResource(R.string.catalog_loading), textColor = ARCTIC_SECONDARY)
+                is CatalogStatus.Failed -> EmptyState(
+                    message = stringResource(R.string.catalog_error),
+                    textColor = ARCTIC_SECONDARY,
+                    accentColor = ARCTIC_ACCENT,
+                    actionLabel = stringResource(R.string.action_retry),
+                    onAction = actions.retryCatalog,
+                )
+                CatalogStatus.Ready -> {
+                    if (model.results.isEmpty()) {
+                        EmptyState(message = stringResource(R.string.catalog_empty), textColor = ARCTIC_SECONDARY)
+                    } else if (searching) {
+                        AppGrid(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
+                    } else {
+                        Crossfade(targetState = view, animationSpec = tween(150), label = "arctic-drawer-view") { target ->
+                            when (target) {
+                                DrawerView.Browse -> BrowseView(
+                                    model = model,
+                                    onOpenCategory = { view = DrawerView.Category(it) },
+                                    onOpenAllApps = { view = DrawerView.AllApps },
+                                    actions = actions,
+                                )
+                                is DrawerView.Category -> {
+                                    val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == target.category }
+                                    AppGrid(entries = group?.apps.orEmpty(), favoriteKeys = model.favoriteKeys, actions = actions)
                                 }
+                                DrawerView.AllApps -> AllAppsView(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DrawerSubHeader(title: String, onBack: () -> Unit) {
+    val backLabel = stringResource(R.string.drawer_back)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp)
+                .clickable(onClick = onBack)
+                .semantics { contentDescription = backLabel },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = "←", color = ARCTIC_ACCENT, fontSize = 17.sp)
+        }
+        Text(text = title.uppercase(), color = ARCTIC_INK, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.4.sp)
     }
 }
 
@@ -139,31 +190,36 @@ private fun BrowseView(
     actions: RiceActions,
 ) {
     val categories = remember(model.results) { DrawerHierarchy.categorize(model.results) }
+    val favoriteApps = remember(model.results, model.favoriteKeys) { model.results.filter { it.key in model.favoriteKeys } }
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item(key = "chips") {
             ChipRow(categories = categories, onSelectCategory = onOpenCategory, onSelectAll = onOpenAllApps)
         }
         if (model.recentApps.isNotEmpty()) {
-            item(key = "recent-header") { SectionLabel(stringResource(R.string.drawer_section_recent)) }
-            item(key = "recent-row") {
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 16.dp)) {
-                    for (entry in model.recentApps.take(5)) {
-                        RecentBubble(entry = entry, actions = actions)
-                    }
-                }
+            item(key = "recent") {
+                AppRowSection(title = stringResource(R.string.drawer_section_recent), apps = model.recentApps, actions = actions)
             }
         }
-        item(key = "categories-header") { SectionLabel(stringResource(R.string.drawer_section_categories)) }
-        item(key = "categories-grid") { CategoryTiles(groups = categories, onClick = onOpenCategory) }
-        item(key = "all-apps") { AllAppsRow(total = model.results.size, onClick = onOpenAllApps) }
+        if (favoriteApps.isNotEmpty()) {
+            item(key = "favorites") {
+                AppRowSection(title = stringResource(R.string.drawer_section_favorites), apps = favoriteApps, actions = actions)
+            }
+        }
+        item(key = "categories-header") { SectionHeader(stringResource(R.string.drawer_section_categories)) }
+        item(key = "categories-grid") { CategoryGrid(groups = categories, onClick = onOpenCategory) }
+        item(key = "all-apps-preview") {
+            AllAppsPreview(entries = model.results, total = model.results.size, onOpen = onOpenAllApps)
+        }
+        item(key = "bottom-space") { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
 @Composable
 private fun ChipRow(categories: List<CategoryGroup>, onSelectCategory: (AppCategory) -> Unit, onSelectAll: () -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 18.dp)) {
         item(key = "chip-all") { Chip(text = stringResource(R.string.drawer_section_all_apps), selected = true, onClick = onSelectAll) }
-        columnItems(categories.take(4), key = { "chip:${it.category}" }) { group ->
+        listItems(categories, key = { "chip:${it.category}" }) { group ->
             Chip(text = stringResource(group.category.labelRes), selected = false, onClick = { onSelectCategory(group.category) })
         }
     }
@@ -171,27 +227,56 @@ private fun ChipRow(categories: List<CategoryGroup>, onSelectCategory: (AppCateg
 
 @Composable
 private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .heightIn(min = 36.dp)
-            .clip(RoundedCornerShape(50))
-            .background(if (selected) ARCTIC_ACCENT.copy(alpha = 0.28f) else Color(0x22FFFFFF))
-            .border(1.dp, if (selected) ARCTIC_ACCENT else ARCTIC_BORDER, RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
+    ArcticGlassSurface(
+        modifier = Modifier.heightIn(min = 40.dp),
+        shape = RoundedCornerShape(50),
+        tint = if (selected) ARCTIC_ACCENT else ARCTIC_GLASS_TINT,
+        baseAlpha = if (selected) 0.34f else 0.24f,
+        onClick = onClick,
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, color = if (selected) ARCTIC_INK else ARCTIC_SECONDARY, fontSize = 13.sp)
+        Text(
+            text = text,
+            color = if (selected) ARCTIC_INK else ARCTIC_SECONDARY,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+        )
     }
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(text = text.uppercase(), color = ARCTIC_SECONDARY, fontSize = 11.sp, letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 10.dp))
+private fun SectionHeader(text: String) {
+    Text(
+        text = text.uppercase(),
+        color = ARCTIC_INK,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.4.sp,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+}
+
+/** Shared by Recientes and Favoritos: a horizontally-scrolling row (never a fixed Row that could
+ * overflow at a narrow width or a large fontScale) of up to 5 real apps. */
+@Composable
+private fun AppRowSection(title: String, apps: List<AppEntry>, actions: RiceActions) {
+    Column(modifier = Modifier.padding(bottom = 20.dp)) {
+        SectionHeader(title)
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            for (entry in apps.take(5)) {
+                AppRowTile(entry = entry, actions = actions)
+            }
+        }
+    }
 }
 
 @Composable
-private fun RecentBubble(entry: AppEntry, actions: RiceActions) {
+private fun AppRowTile(entry: AppEntry, actions: RiceActions) {
     Column(
         modifier = Modifier.combinedClickable(
             onClick = { actions.openApp(entry.key) },
@@ -199,22 +284,22 @@ private fun RecentBubble(entry: AppEntry, actions: RiceActions) {
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AppIcon(entry = entry, size = 44.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
+        AppIcon(entry = entry, size = 46.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
         Text(
             text = entry.label,
             color = ARCTIC_INK,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 6.dp).width(58.dp),
         )
     }
 }
 
 @Composable
-private fun CategoryTiles(groups: List<CategoryGroup>, onClick: (AppCategory) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+private fun CategoryGrid(groups: List<CategoryGroup>, onClick: (AppCategory) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 20.dp)) {
         for (row in groups.chunked(2)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (group in row) {
@@ -228,41 +313,70 @@ private fun CategoryTiles(groups: List<CategoryGroup>, onClick: (AppCategory) ->
 
 @Composable
 private fun CategoryTile(group: CategoryGroup, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .heightIn(min = 68.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0x22FFFFFF))
-            .border(1.dp, ARCTIC_BORDER, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ArcticGlassSurface(
+        modifier = modifier.heightIn(min = 76.dp, max = 88.dp),
+        shape = RoundedCornerShape(20.dp),
+        baseAlpha = 0.24f,
+        onClick = onClick,
     ) {
-        Text(text = stringResource(group.category.labelRes), color = ARCTIC_INK, fontSize = 14.sp)
-        Text(
-            text = pluralStringResource(R.plurals.category_app_count, group.apps.size, group.apps.size),
-            color = ARCTIC_SECONDARY,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(ARCTIC_ICON_PLATE),
+                contentAlignment = Alignment.Center,
+            ) {
+                CategoryGlyph(category = group.category, tint = ARCTIC_ACCENT, modifier = Modifier.size(18.dp))
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(group.category.labelRes),
+                    color = ARCTIC_INK,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = pluralStringResource(R.plurals.category_app_count, group.apps.size, group.apps.size),
+                    color = ARCTIC_SECONDARY,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Text(text = "→", color = ARCTIC_SECONDARY, fontSize = 14.sp)
+        }
     }
 }
 
 @Composable
-private fun AllAppsRow(total: Int, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 52.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0x22FFFFFF))
-            .border(1.dp, ARCTIC_BORDER, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = stringResource(R.string.drawer_section_all_apps), color = ARCTIC_INK, fontSize = 15.sp)
-        Text(text = "$total →", color = ARCTIC_SECONDARY, fontSize = 13.sp)
+private fun AllAppsPreview(entries: List<AppEntry>, total: Int, onOpen: () -> Unit) {
+    ArcticGlassSurface(modifier = Modifier.fillMaxWidth(), baseAlpha = 0.24f, onClick = onOpen) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.drawer_section_all_apps).uppercase(),
+                    color = ARCTIC_INK,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.4.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = pluralStringResource(R.plurals.catalog_result_count, total, total), color = ARCTIC_SECONDARY, fontSize = 12.sp)
+                    Text(text = "A–Z", color = ARCTIC_ACCENT, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            if (entries.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    for (entry in entries.take(4)) {
+                        AppIcon(entry = entry, size = 38.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -313,6 +427,100 @@ private fun GridCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, 
     }
 }
 
+/**
+ * The full "Todas las apps" destination: a structured, letter-headered list (never a repeat of
+ * the flat search grid) with a tappable A-Z rail that scrolls to that letter — an optional
+ * addition the task allows, and useful once the list is a few dozen apps long.
+ */
+@Composable
+private fun AllAppsView(entries: List<AppEntry>, favoriteKeys: Set<AppKey>, actions: RiceActions) {
+    if (entries.isEmpty()) {
+        EmptyState(message = stringResource(R.string.catalog_empty), textColor = ARCTIC_SECONDARY)
+        return
+    }
+    val groups = remember(entries) { DrawerHierarchy.groupByInitial(entries) }
+    val listState = remember(groups.map { it.first }) { LazyListState() }
+    val scope = rememberCoroutineScope()
+    val letterIndex = remember(groups) {
+        val map = LinkedHashMap<String, Int>()
+        var index = 0
+        for ((letter, apps) in groups) {
+            map[letter] = index
+            index += 1 + apps.size
+        }
+        map
+    }
+
+    Row(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxHeight()) {
+            for ((letter, apps) in groups) {
+                item(key = "header-$letter") {
+                    Text(
+                        text = letter,
+                        color = ARCTIC_ACCENT,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.6.sp,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+                    )
+                }
+                listItems(apps, key = { "${it.key.userSerial}:${it.key.component}" }) { entry ->
+                    AllAppsRow(entry = entry, isFavorite = entry.key in favoriteKeys, actions = actions)
+                }
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .wrapContentWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            for ((letter, _) in groups) {
+                Text(
+                    text = letter,
+                    color = ARCTIC_SECONDARY,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .padding(vertical = 3.dp, horizontal = 6.dp)
+                        .clickable {
+                            letterIndex[letter]?.let { index -> scope.launch { listState.animateScrollToItem(index) } }
+                        },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AllAppsRow(entry: AppEntry, isFavorite: Boolean, actions: RiceActions) {
+    val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .combinedClickable(
+                onClick = { actions.openApp(entry.key) },
+                onLongClick = { actions.showAppMenu(entry.key) },
+                onLongClickLabel = toggleLabel,
+            )
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppIcon(entry = entry, size = 36.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
+        Text(
+            text = entry.label,
+            color = ARCTIC_INK,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 12.dp).weight(1f),
+        )
+        if (isFavorite) Text(text = "·", color = ARCTIC_ACCENT, fontSize = 16.sp)
+    }
+}
+
 @Composable
 private fun ArcticSearchField(
     query: String,
@@ -322,30 +530,171 @@ private fun ArcticSearchField(
     modifier: Modifier = Modifier,
 ) {
     val keyboardActions = rememberSearchKeyboardActions(resultCount, onSearchSingleResult)
-    BasicTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        singleLine = true,
-        textStyle = TextStyle(color = ARCTIC_INK, fontSize = 15.sp),
-        cursorBrush = SolidColor(ARCTIC_INK),
-        keyboardOptions = SearchImeOptions,
-        keyboardActions = keyboardActions,
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Color(0x33FFFFFF))
-            .border(1.dp, ARCTIC_BORDER, RoundedCornerShape(50))
-            .padding(horizontal = 18.dp),
-        decorationBox = { inner ->
-            // No fillMaxSize: a height-filling box here would claim the whole remaining Column
-            // height (it's measured before the weighted catalog Box below it) instead of its own
-            // row, starving the grid — the contract bug this pass fixed.
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                if (query.isEmpty()) {
-                    Text(text = stringResource(R.string.search_hint), color = ARCTIC_SECONDARY, fontSize = 15.sp)
-                }
-                inner()
+    ArcticGlassSurface(
+        modifier = modifier.heightIn(min = 54.dp),
+        shape = RoundedCornerShape(50),
+        baseAlpha = 0.26f,
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            SearchGlyph(tint = ARCTIC_SECONDARY, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = TextStyle(color = ARCTIC_INK, fontSize = 15.sp),
+                    cursorBrush = SolidColor(ARCTIC_INK),
+                    keyboardOptions = SearchImeOptions,
+                    keyboardActions = keyboardActions,
+                    modifier = Modifier.fillMaxWidth(),
+                    // fillMaxWidth, never fillMaxSize/fillMaxHeight: this field is a *non-weighted*
+                    // first child of the outer Column, measured before the weighted catalog Box
+                    // below it — a height-filling decoration here reproduces the exact bug fixed
+                    // earlier this sprint (an unweighted sibling claiming the Column's full height).
+                    decorationBox = { inner ->
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) {
+                                Text(text = stringResource(R.string.search_hint), color = ARCTIC_SECONDARY, fontSize = 15.sp)
+                            }
+                            inner()
+                        }
+                    },
+                )
             }
-        },
-    )
+        }
+    }
+}
+
+@Composable
+private fun SearchGlyph(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val strokeWidth = w * 0.16f
+        val radius = w * 0.30f
+        val center = Offset(w * 0.42f, h * 0.42f)
+        drawCircle(color = tint, radius = radius, center = center, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+        val handleStart = Offset(center.x + radius * 0.72f, center.y + radius * 0.72f)
+        val handleEnd = Offset(w * 0.88f, h * 0.88f)
+        drawLine(color = tint, start = handleStart, end = handleEnd, strokeWidth = strokeWidth, cap = StrokeCap.Round)
+    }
+}
+
+/** Simple line-art glyphs per category — never a plain grey circle (contract §"ICONOS"). Drawn,
+ * not a new drawable asset: the project has no icon-font/vector library dependency to add one. */
+@Composable
+private fun CategoryGlyph(category: AppCategory, tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val strokeWidth = w * 0.10f
+        val outline = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        when (category) {
+            AppCategory.Communication -> {
+                drawRoundRect(
+                    color = tint,
+                    topLeft = Offset(w * 0.12f, h * 0.16f),
+                    size = Size(w * 0.76f, h * 0.54f),
+                    cornerRadius = CornerRadius(w * 0.16f),
+                    style = outline,
+                )
+                val tail = Path().apply {
+                    moveTo(w * 0.30f, h * 0.68f)
+                    lineTo(w * 0.24f, h * 0.88f)
+                    lineTo(w * 0.48f, h * 0.70f)
+                    close()
+                }
+                drawPath(tail, color = tint)
+            }
+            AppCategory.Productivity -> {
+                drawRoundRect(
+                    color = tint,
+                    topLeft = Offset(w * 0.20f, h * 0.14f),
+                    size = Size(w * 0.60f, h * 0.72f),
+                    cornerRadius = CornerRadius(w * 0.10f),
+                    style = outline,
+                )
+                val check = Path().apply {
+                    moveTo(w * 0.34f, h * 0.52f)
+                    lineTo(w * 0.46f, h * 0.64f)
+                    lineTo(w * 0.68f, h * 0.36f)
+                }
+                drawPath(check, color = tint, style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            AppCategory.Multimedia -> {
+                drawCircle(color = tint, radius = w * 0.36f, center = Offset(w * 0.5f, h * 0.5f), style = outline)
+                val play = Path().apply {
+                    moveTo(w * 0.42f, h * 0.34f)
+                    lineTo(w * 0.42f, h * 0.66f)
+                    lineTo(w * 0.68f, h * 0.5f)
+                    close()
+                }
+                drawPath(play, color = tint)
+            }
+            AppCategory.News -> {
+                drawRoundRect(
+                    color = tint,
+                    topLeft = Offset(w * 0.16f, h * 0.16f),
+                    size = Size(w * 0.68f, h * 0.68f),
+                    cornerRadius = CornerRadius(w * 0.10f),
+                    style = outline,
+                )
+                val lineY = floatArrayOf(0.36f, 0.5f, 0.64f)
+                val lineW = floatArrayOf(0.44f, 0.44f, 0.28f)
+                for (i in lineY.indices) {
+                    drawLine(
+                        color = tint,
+                        start = Offset(w * 0.30f, h * lineY[i]),
+                        end = Offset(w * (0.30f + lineW[i]), h * lineY[i]),
+                        strokeWidth = w * 0.055f,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            AppCategory.MapsTravel -> {
+                val drop = Path().apply {
+                    moveTo(w * 0.5f, h * 0.86f)
+                    lineTo(w * 0.32f, h * 0.50f)
+                    lineTo(w * 0.68f, h * 0.50f)
+                    close()
+                }
+                drawPath(drop, color = tint)
+                drawCircle(color = tint, radius = w * 0.22f, center = Offset(w * 0.5f, h * 0.36f), style = outline)
+            }
+            AppCategory.Games -> {
+                drawRoundRect(
+                    color = tint,
+                    topLeft = Offset(w * 0.12f, h * 0.34f),
+                    size = Size(w * 0.76f, h * 0.36f),
+                    cornerRadius = CornerRadius(w * 0.18f),
+                    style = outline,
+                )
+                drawCircle(color = tint, radius = w * 0.045f, center = Offset(w * 0.68f, h * 0.46f))
+                drawCircle(color = tint, radius = w * 0.045f, center = Offset(w * 0.78f, h * 0.56f))
+                drawLine(color = tint, start = Offset(w * 0.24f, h * 0.52f), end = Offset(w * 0.24f, h * 0.40f), strokeWidth = w * 0.055f, cap = StrokeCap.Round)
+                drawLine(color = tint, start = Offset(w * 0.18f, h * 0.46f), end = Offset(w * 0.30f, h * 0.46f), strokeWidth = w * 0.055f, cap = StrokeCap.Round)
+            }
+            AppCategory.Tools -> {
+                rotate(degrees = 45f) {
+                    drawRoundRect(
+                        color = tint,
+                        topLeft = Offset(w * 0.14f, h * 0.44f),
+                        size = Size(w * 0.72f, h * 0.12f),
+                        cornerRadius = CornerRadius(w * 0.06f),
+                    )
+                }
+                drawCircle(color = tint, radius = w * 0.13f, center = Offset(w * 0.24f, h * 0.24f), style = outline)
+                drawCircle(color = tint, radius = w * 0.13f, center = Offset(w * 0.76f, h * 0.76f), style = outline)
+            }
+            AppCategory.Other -> {
+                val positions = listOf(
+                    Offset(w * 0.30f, h * 0.30f), Offset(w * 0.70f, h * 0.30f),
+                    Offset(w * 0.30f, h * 0.70f), Offset(w * 0.70f, h * 0.70f),
+                )
+                for (p in positions) drawCircle(color = tint, radius = w * 0.09f, center = p)
+            }
+        }
+    }
 }
