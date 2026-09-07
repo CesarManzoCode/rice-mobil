@@ -620,14 +620,14 @@ private fun ArcticSearchField(
         label = "search-focus",
     )
     val glowTint = lerp(ARCTIC_GLASS_TINT, ARCTIC_ACCENT, focusProgress * 0.5f)
-    val glowBorder = remember(focusProgress) {
-        Brush.verticalGradient(
-            listOf(
-                lerp(ARCTIC_BORDER_HI, ARCTIC_ACCENT, focusProgress),
-                lerp(ARCTIC_BORDER, ARCTIC_ACCENT.copy(alpha = 0.55f), focusProgress),
-            ),
-        )
-    }
+    // No `remember` here: focusProgress changes every animation frame during the ~160ms tween, so
+    // it would never actually hit, cache or not — a plain per-recomposition Brush is the honest cost.
+    val glowBorder = Brush.verticalGradient(
+        listOf(
+            lerp(ARCTIC_BORDER_HI, ARCTIC_ACCENT, focusProgress),
+            lerp(ARCTIC_BORDER, ARCTIC_ACCENT.copy(alpha = 0.55f), focusProgress),
+        ),
+    )
     ArcticGlassSurface(
         modifier = modifier.heightIn(min = 54.dp),
         shape = RoundedCornerShape(50),

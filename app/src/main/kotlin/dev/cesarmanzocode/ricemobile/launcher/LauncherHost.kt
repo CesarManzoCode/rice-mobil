@@ -39,6 +39,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -172,14 +173,20 @@ fun LauncherHost(
     // `::function` reference recreated on every recomposition would.
     val drawerProgress = remember { { if (dragActive) rawDrawerProgress else drawerSettle.value } }
 
+    // Guards against a superseded settle's `onArrived` firing after a *later* settle already
+    // moved the panel elsewhere (e.g. tap-to-open, then a quick close-drag before the open spring
+    // finished): only the most recent call's completion is allowed to touch ViewModel state.
+    var settleGeneration by remember { mutableIntStateOf(0) }
+
     fun settleDrawer(target: Float, onArrived: (() -> Unit)? = null) {
         val start = drawerProgress()
         dragActive = false
+        val generation = ++settleGeneration
         scope.launch {
             if (drawerSettle.value != start) drawerSettle.snapTo(start)
             val spec = if (reducedMotionState.value) MotionTokens.ReducedMotionSettle else MotionTokens.PanelSettleSpring
             drawerSettle.animateTo(target, spec)
-            onArrived?.invoke()
+            if (generation == settleGeneration) onArrived?.invoke()
         }
     }
 
@@ -239,7 +246,11 @@ fun LauncherHost(
             viewModel.goHome()
             drawerSettle.snapTo(0f)
         } catch (cancellation: CancellationException) {
-            dragActive = false
+            // NOTE: `dragActive` is intentionally left true here — settleDrawer() itself reads
+            // drawerProgress() (which resolves to the live rawDrawerProgress while dragActive is
+            // still true) *before* flipping it to false. Clearing it first would make that read
+            // fall through to the stale, pre-gesture drawerSettle.value instead, springing back
+            // from the wrong point (or not animating at all if it was already 1f).
             settleDrawer(1f)
             throw cancellation
         }
