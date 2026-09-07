@@ -1,4 +1,4 @@
-package dev.cesarmanzocode.ricemobile.rice.monochrome
+package dev.cesarmanzocode.ricemobile.rice.ember
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,13 +30,13 @@ import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchField
 
-private val MONOCHROME_BACKGROUND = Color(0xFF0A0A0A)
-private val MONOCHROME_INK = Color(0xFFF5F5F0)
+private val EMBER_BACKGROUND = Color(0xFF241512)
+private val EMBER_INK = Color(0xFFF2E4D8)
 
-/** Monochrome Drawer structure: a single list (contract prompt). */
+/** Ember Forge Drawer structure: two columns of compact rows (contract prompt). */
 @Composable
-fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxSize().background(MONOCHROME_BACKGROUND).safeDrawingPadding()) {
+fun EmberDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxSize().background(EMBER_BACKGROUND).safeDrawingPadding()) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (model.status) {
                 CatalogStatus.Loading -> EmptyState(message = stringResource(R.string.catalog_loading))
@@ -49,9 +49,9 @@ fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifie
                     if (model.results.isEmpty()) {
                         EmptyState(message = stringResource(R.string.catalog_empty))
                     } else {
-                        LazyColumn {
+                        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.padding(8.dp)) {
                             items(model.results, key = { "${it.key.userSerial}:${it.key.component}" }) { entry ->
-                                AppRow(
+                                CompactRow(
                                     entry = entry,
                                     isFavorite = entry.key in model.favoriteKeys,
                                     onClick = { actions.openApp(entry.key) },
@@ -74,21 +74,16 @@ fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifie
 }
 
 @Composable
-private fun AppRow(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun CompactRow(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppIcon(entry = entry, size = 36.dp)
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(text = entry.label, color = MONOCHROME_INK)
-        if (isFavorite) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "★", color = MONOCHROME_INK)
-        }
+        AppIcon(entry = entry, size = 28.dp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = (if (isFavorite) "★ " else "") + entry.label, color = EMBER_INK, maxLines = 1)
     }
 }

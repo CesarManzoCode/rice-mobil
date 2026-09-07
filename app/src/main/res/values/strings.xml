@@ -7,4 +7,18 @@
     <string name="catalog_empty">Sin resultados</string>
     <string name="catalog_error">No se pudo actualizar</string>
     <string name="action_retry">Reintentar</string>
+    <string name="action_add_favorite">Añadir a favoritos</string>
+    <string name="action_remove_favorite">Quitar de favoritos</string>
+    <string name="favorites_empty_hint">Mantén pulsada una app para fijarla</string>
+    <string name="favorite_unavailable">No disponible</string>
+    <string name="favorite_limit_reached">Máximo 5 favoritos. Quita uno primero.</string>
+    <string name="action_open_rice_picker">Rice</string>
+    <string name="rice_picker_title">Elige un rice</string>
+    <string name="rice_name_monochrome">Monochrome</string>
+    <string name="rice_name_arctic_glass">Arctic Glass</string>
+    <string name="rice_name_ember_forge">Ember Forge</string>
+    <string name="rice_name_ivory_paper">Ivory Paper</string>
+    <string name="rice_name_violet_night">Violet Night</string>
+    <string name="wallpaper_failed">No se pudo cambiar el fondo</string>
+    <string name="preferences_unavailable">No se pudieron leer las preferencias</string>
 </resources>
