@@ -10,15 +10,17 @@ import dev.cesarmanzocode.ricemobile.rice.RiceId
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperSpec
 
-/** Structure: Home favorites as a textual index; Drawer is an editorial index list. */
+/** Editorial page (contract §18.5): a dateline first, a serif hour at mid-height with generous
+ * air, favorites as a numbered textual index (no icons on Home by editorial decision), and a
+ * Drawer that reads as an alphabetical index rather than an app grid. */
 object IvoryPaperRice : Rice {
     override val id = RiceId.IvoryPaper
     override val wallpaper = WallpaperSpec(
-        assetPath = "wallpapers/ivory_paper.png",
-        assetRevision = 1,
-        fallbackColorArgb = 0xFFF3ECDFL,
+        assetPath = "wallpapers/ivory_paper.webp",
+        assetRevision = 2,
+        fallbackColorArgb = 0xFFF3EBDDL,
     )
-    override val motion = RiceMotion(drawerEnterMs = 200, drawerExitMs = 160)
+    override val motion = RiceMotion.Ivory
     override val lightSystemBars = true
 
     @Composable
