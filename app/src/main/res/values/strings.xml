@@ -61,6 +61,7 @@
     <string name="home_recent_title">Recientes</string>
     <string name="home_recent_see_all">Ver todas</string>
     <string name="action_open_drawer_hint">Abrir todas las apps</string>
+    <string name="action_close_drawer_hint">Cerrar todas las apps</string>
     <string name="drawer_section_favorites">Favoritos</string>
     <string name="ivory_hoy_title">Hoy</string>
     <string name="ivory_tagline">Un día enfocado también es un día pleno.</string>

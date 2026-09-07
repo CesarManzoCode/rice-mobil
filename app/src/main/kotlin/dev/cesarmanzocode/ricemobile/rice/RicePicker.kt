@@ -3,7 +3,6 @@ package dev.cesarmanzocode.ricemobile.rice
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -29,6 +28,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.cesarmanzocode.ricemobile.R
+import dev.cesarmanzocode.ricemobile.ui.shared.ricePressable
+
+private const val PICKER_PRESS_SCALE = 0.97f
+private const val PICKER_PRESS_MS = 90
 
 private val PICKER_BACKGROUND = Color(0xFF141414)
 private val PICKER_CHROME = Color(0xFFF5F5F0)
@@ -85,7 +88,7 @@ private fun RiceOption(rice: Rice, selected: Boolean, onClick: () -> Unit) {
                 color = if (selected) preview.ink else preview.ink.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(14.dp),
             )
-            .clickable(onClick = onClick)
+            .ricePressable(pressScale = PICKER_PRESS_SCALE, pressMs = PICKER_PRESS_MS, onClick = onClick)
             .padding(14.dp),
     ) {
         Canvas(modifier = Modifier.fillMaxWidth().aspectRatio(2f)) {
