@@ -59,4 +59,6 @@
     <string name="next_alarm_label">Próxima alarma</string>
     <string name="next_alarm_none">Sin alarma</string>
     <string name="home_recent_title">Recientes</string>
+    <string name="ivory_hoy_title">Hoy</string>
+    <string name="ivory_tagline">Un día enfocado también es un día pleno.</string>
 </resources>
