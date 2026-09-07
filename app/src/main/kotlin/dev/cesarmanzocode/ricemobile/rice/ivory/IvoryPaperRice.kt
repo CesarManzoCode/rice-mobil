@@ -17,7 +17,7 @@ object IvoryPaperRice : Rice {
     override val id = RiceId.IvoryPaper
     override val wallpaper = WallpaperSpec(
         assetPath = "wallpapers/ivory_paper.webp",
-        assetRevision = 2,
+        assetRevision = 3,
         fallbackColorArgb = 0xFFF3EBDDL,
     )
     override val motion = RiceMotion.Ivory

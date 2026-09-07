@@ -16,7 +16,7 @@ object EmberForgeRice : Rice {
     override val id = RiceId.EmberForge
     override val wallpaper = WallpaperSpec(
         assetPath = "wallpapers/ember_forge.webp",
-        assetRevision = 2,
+        assetRevision = 3,
         fallbackColorArgb = 0xFF171411L,
     )
     override val motion = RiceMotion.Ember

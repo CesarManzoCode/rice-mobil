@@ -1,6 +1,7 @@
 package dev.cesarmanzocode.ricemobile.rice.violet
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -151,7 +152,14 @@ private fun HeroModule(recentApps: List<AppEntry>, actions: RiceActions) {
         }
         if (mostRecent != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(entry = mostRecent, size = 52.dp, plateShape = RoundedCornerShape(16.dp), plateColor = VIOLET_INDIGO.copy(alpha = 0.6f))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, VIOLET_ACCENT.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+                        .padding(3.dp),
+                ) {
+                    AppIcon(entry = mostRecent, size = 52.dp, plateShape = RoundedCornerShape(16.dp), plateColor = VIOLET_INDIGO.copy(alpha = 0.6f))
+                }
                 Spacer(modifier = Modifier.padding(start = 14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = stringResource(R.string.home_recent_title).uppercase(), color = VIOLET_SECONDARY, fontSize = 11.sp, letterSpacing = 0.5.sp)

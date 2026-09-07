@@ -16,7 +16,7 @@ object MonochromeRice : Rice {
     override val id = RiceId.Monochrome
     override val wallpaper = WallpaperSpec(
         assetPath = "wallpapers/monochrome.webp",
-        assetRevision = 2,
+        assetRevision = 3,
         fallbackColorArgb = 0xFF0A0A0AL,
     )
     override val motion = RiceMotion.Monochrome

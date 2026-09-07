@@ -115,8 +115,13 @@ private fun riceDisplayNameRes(id: RiceId): String = stringResource(
 private fun DrawScope.drawStructure(id: RiceId, size: Size, ink: Color) {
     when (id) {
         RiceId.Monochrome -> {
-            // A big clock block, then a linear stack of favorite rows.
+            // A big clock block, a thin glance-module bar, then a linear stack of favorite rows.
             drawRect(color = ink.copy(alpha = 0.9f), topLeft = Offset(0f, 0f), size = Size(size.width * 0.5f, size.height * 0.32f))
+            drawRect(
+                color = ink.copy(alpha = 0.25f),
+                topLeft = Offset(0f, size.height * 0.38f),
+                size = Size(size.width * 0.72f, size.height * 0.1f),
+            )
             val rowHeight = size.height * 0.14f
             for (i in 0 until 3) {
                 val top = size.height * 0.55f + i * rowHeight * 1.25f
@@ -124,12 +129,18 @@ private fun DrawScope.drawStructure(id: RiceId, size: Size, ink: Color) {
             }
         }
         RiceId.ArcticGlass -> {
-            // A small centered clock pill, then a floating rounded dock near the bottom.
+            // A small centered clock pill, two glass glance panels, then a floating dock.
             drawRoundRect(
                 color = ink.copy(alpha = 0.7f),
                 topLeft = Offset(size.width * 0.38f, 0f),
                 size = Size(size.width * 0.24f, size.height * 0.16f),
                 cornerRadius = CornerRadius(size.height * 0.08f, size.height * 0.08f),
+            )
+            drawRoundRect(
+                color = ink.copy(alpha = 0.22f),
+                topLeft = Offset(size.width * 0.1f, size.height * 0.30f),
+                size = Size(size.width * 0.8f, size.height * 0.14f),
+                cornerRadius = CornerRadius(size.height * 0.05f, size.height * 0.05f),
             )
             val dockHeight = size.height * 0.34f
             drawRoundRect(
@@ -140,12 +151,15 @@ private fun DrawScope.drawStructure(id: RiceId, size: Size, ink: Color) {
             )
         }
         RiceId.EmberForge -> {
-            // One full-width block, then a 2x2 grid beneath it (contract §18.4's 1+2x2 matrix).
+            // A header, two small dashboard cards, then a 2x2 favorites matrix beneath them.
             val gap = size.width * 0.03f
-            drawRect(color = ink.copy(alpha = 0.85f), topLeft = Offset(0f, 0f), size = Size(size.width, size.height * 0.28f))
+            drawRect(color = ink.copy(alpha = 0.85f), topLeft = Offset(0f, 0f), size = Size(size.width, size.height * 0.20f))
+            val cardW = (size.width - gap) / 2f
+            drawRect(color = ink.copy(alpha = 0.3f), topLeft = Offset(0f, size.height * 0.25f), size = Size(cardW, size.height * 0.12f))
+            drawRect(color = ink.copy(alpha = 0.3f), topLeft = Offset(cardW + gap, size.height * 0.25f), size = Size(cardW, size.height * 0.12f))
             val cellW = (size.width - gap) / 2f
-            val cellH = size.height * 0.3f
-            val startY = size.height * 0.42f
+            val cellH = size.height * 0.28f
+            val startY = size.height * 0.44f
             for (row in 0 until 2) {
                 for (col in 0 until 2) {
                     drawRect(
@@ -157,24 +171,35 @@ private fun DrawScope.drawStructure(id: RiceId, size: Size, ink: Color) {
             }
         }
         RiceId.IvoryPaper -> {
-            // A large margin initial, then short editorial rule lines (an index, not a grid).
+            // A large margin initial, a "HOY" editorial module, then short favorite index lines.
             drawRect(color = ink.copy(alpha = 0.85f), topLeft = Offset(0f, 0f), size = Size(size.width * 0.08f, size.height * 0.28f))
-            val lineHeight = size.height * 0.14f
+            drawRect(
+                color = ink.copy(alpha = 0.2f),
+                topLeft = Offset(size.width * 0.16f, size.height * 0.34f),
+                size = Size(size.width * 0.7f, size.height * 0.16f),
+            )
+            val lineHeight = size.height * 0.12f
             val widths = listOf(0.85f, 0.55f, 0.7f)
             for ((i, w) in widths.withIndex()) {
                 drawRect(
                     color = ink.copy(alpha = 0.6f),
-                    topLeft = Offset(size.width * 0.16f, i * lineHeight * 1.6f),
+                    topLeft = Offset(size.width * 0.16f, size.height * 0.58f + i * lineHeight * 1.5f),
                     size = Size(size.width * w, lineHeight * 0.4f),
                 )
             }
         }
         RiceId.VioletNight -> {
-            // A small end-aligned clock mark, then a 1-2-2 cluster of circles below it.
+            // A small end-aligned clock mark, a hero module, then a 1-2-2 cluster below it.
             drawRect(color = ink.copy(alpha = 0.6f), topLeft = Offset(size.width * 0.7f, 0f), size = Size(size.width * 0.3f, size.height * 0.14f))
-            val r = size.height * 0.11f
+            drawRoundRect(
+                color = ink.copy(alpha = 0.22f),
+                topLeft = Offset(size.width * 0.08f, size.height * 0.22f),
+                size = Size(size.width * 0.84f, size.height * 0.18f),
+                cornerRadius = CornerRadius(size.height * 0.05f, size.height * 0.05f),
+            )
+            val r = size.height * 0.1f
             val centerX = size.width / 2f
-            val baseY = size.height * 0.55f
+            val baseY = size.height * 0.62f
             drawCircle(color = ink.copy(alpha = 0.85f), radius = r, center = Offset(centerX, baseY))
             drawCircle(color = ink.copy(alpha = 0.7f), radius = r * 0.8f, center = Offset(centerX - r * 2.4f, baseY + r * 2.1f))
             drawCircle(color = ink.copy(alpha = 0.7f), radius = r * 0.8f, center = Offset(centerX + r * 2.4f, baseY + r * 2.1f))

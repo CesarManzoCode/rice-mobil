@@ -18,7 +18,7 @@ object VioletNightRice : Rice {
     override val id = RiceId.VioletNight
     override val wallpaper = WallpaperSpec(
         assetPath = "wallpapers/violet_night.webp",
-        assetRevision = 2,
+        assetRevision = 3,
         fallbackColorArgb = 0xFF100C24L,
     )
     override val motion = RiceMotion.Violet

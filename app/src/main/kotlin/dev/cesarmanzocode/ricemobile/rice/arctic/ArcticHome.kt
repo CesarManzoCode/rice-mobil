@@ -64,6 +64,9 @@ internal val ARCTIC_SECONDARY = Color(0xFFACCAD5)
 internal val ARCTIC_ACCENT = Color(0xFF78DCEF)
 internal val ARCTIC_GLASS = Color(0xE0142E42)
 internal val ARCTIC_BORDER = Color(0x2EFFFFFF)
+/** Icon plate contract §9 "halo cyan muy sutil": a faint brand-cyan tint instead of plain white,
+ * so an icon plate reads as Arctic's own rather than a generic translucent circle. */
+internal val ARCTIC_ICON_PLATE = Color(0x3378DCEF)
 
 /**
  * Arctic Home (approved mockup, Sprint 3 second pass): a light centered clock, the mockup's
@@ -198,7 +201,7 @@ private fun RecentsPanel(recentApps: List<AppEntry>, actions: RiceActions) {
                     ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AppIcon(entry = entry, size = 36.dp, plateShape = CircleShape, plateColor = Color(0x33FFFFFF))
+                    AppIcon(entry = entry, size = 36.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
                 }
             }
         }
@@ -272,7 +275,7 @@ private fun DockSlot(slot: FavoriteSlot, actions: RiceActions, modifier: Modifie
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (app != null) {
-            AppIcon(entry = app, size = 40.dp, plateShape = CircleShape, plateColor = Color(0x33FFFFFF))
+            AppIcon(entry = app, size = 40.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
             Text(
                 text = app.label,
                 color = ARCTIC_INK,

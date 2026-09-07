@@ -195,7 +195,7 @@ private fun RecentBubble(entry: AppEntry, actions: RiceActions) {
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AppIcon(entry = entry, size = 44.dp, plateShape = CircleShape, plateColor = Color(0x33FFFFFF))
+        AppIcon(entry = entry, size = 44.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
         Text(
             text = entry.label,
             color = ARCTIC_INK,
@@ -295,7 +295,7 @@ private fun GridCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, 
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AppIcon(entry = entry, size = 44.dp, plateShape = CircleShape, plateColor = Color(0x33FFFFFF))
+        AppIcon(entry = entry, size = 44.dp, plateShape = CircleShape, plateColor = ARCTIC_ICON_PLATE)
         Text(
             text = entry.label,
             color = ARCTIC_INK,
