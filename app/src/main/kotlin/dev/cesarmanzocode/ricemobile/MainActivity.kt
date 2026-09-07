@@ -25,7 +25,12 @@ class MainActivity : ComponentActivity() {
     private val roleManager: RoleManager by lazy { getSystemService(RoleManager::class.java) }
 
     private val viewModel: LauncherViewModel by viewModels {
-        LauncherViewModelFactory(container.appsRepository, container.appLauncher)
+        LauncherViewModelFactory(
+            repository = container.appsRepository,
+            launcher = container.appLauncher,
+            preferencesRepository = container.preferencesRepository,
+            wallpaperController = container.wallpaperController,
+        )
     }
 
     private val requestHome = registerForActivityResult(
