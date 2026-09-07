@@ -93,3 +93,35 @@ No hay modelo/API de teléfono, modo de navegación ni número de apps del catá
 4. Revisar el resultado real de lint/warnings del compilador una vez que el build corra (no verificado aquí).
 
 Nada de esto bloquea la entrega del código: todo el trabajo de S1 está commiteado y pusheado en `feat/launcher-spine`, listo para que el primer build real confirme o señale errores puntuales de compilación.
+
+## 6. Validación real ejecutada por el usuario (entorno local, no este sandbox)
+
+**Importante:** todo lo siguiente fue ejecutado por el usuario en su propia máquina Arch Linux, con Android SDK/JDK/`adb` reales instalados localmente. Esta sesión de Claude Code (sandbox remoto) no ejecutó ninguno de estos comandos ni tiene acceso al teléfono; se registra aquí lo que el usuario reportó, sin inventar outputs exactos de consola que este entorno no produjo.
+
+**SHA validado:** `27cfd5c` (fix de compilación en `feat/launcher-spine`, cabeza del PR #1 en el momento del merge) o un descendiente válido de esa branch.
+
+**Hardware:** teléfono físico CUBOT KINGKONG X, conectado por USB vía `adb`.
+
+### Comandos ejecutados por el usuario — resultado reportado
+
+| Comando | Resultado |
+|---|---|
+| `./gradlew test` | PASS |
+| `./gradlew lint` | PASS |
+| `./gradlew assembleDebug` | PASS |
+| `adb install -r app/build/outputs/apk/debug/app-debug.apk` | PASS |
+
+### Gate físico D01–D04 — reportado PASS
+
+- rice-mobile fue seleccionado como Home vía RoleManager.
+- Pulsar Home físico regresa correctamente a rice-mobile.
+- Swipe up desde el fondo libre de Home abre el Drawer.
+- El catálogo real del dispositivo aparece en el Drawer.
+- La búsqueda local filtra correctamente sobre ese catálogo.
+- Abrir una app desde el Drawer funciona y, al volver a Home, el launcher queda limpio (query vacía, sin drawer/menú abiertos).
+
+Con esto, D01 (instalar → rol → Home → swipe → buscar → abrir → Home) y las verificaciones asociadas a D02–D04 relevantes para S1 quedan **PASS**, según lo reportado por el usuario sobre hardware real. El aspecto visual de Monochrome en S1 es deliberadamente provisional (contrato §14) y no fue ni debe ser evaluado como diseño final.
+
+### Cierre
+
+Con toolchain, build automatizado y gate físico confirmados sobre hardware real por el usuario, **Sprint 1 (Launcher Spine) queda cerrado**. El PR #1 (`feat/launcher-spine` → `main`) fue mergeado por el usuario (`merged_by: CesarManzoCode`, merge commit `e0a4d8e`) y `main` en `origin` ya contiene el árbol completo de S1. Sprint 2 (`feat/rice-engine`) parte de ese `main`.
