@@ -17,7 +17,7 @@ object ArcticGlassRice : Rice {
     override val id = RiceId.ArcticGlass
     override val wallpaper = WallpaperSpec(
         assetPath = "wallpapers/arctic_glass.webp",
-        assetRevision = 3,
+        assetRevision = 4,
         fallbackColorArgb = 0xFF071B2AL,
     )
     override val motion = RiceMotion.Arctic
