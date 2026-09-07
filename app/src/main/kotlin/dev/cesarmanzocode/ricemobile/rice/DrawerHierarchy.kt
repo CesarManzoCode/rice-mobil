@@ -1,9 +1,13 @@
 package dev.cesarmanzocode.ricemobile.rice
 
+import androidx.compose.runtime.Immutable
 import dev.cesarmanzocode.ricemobile.apps.AppCategory
 import dev.cesarmanzocode.ricemobile.apps.AppEntry
 
-/** One non-empty category and the apps currently classified into it (§"CATEGORÍAS"). */
+/** One non-empty category and the apps currently classified into it (§"CATEGORÍAS"). [apps] is a
+ * freshly-derived, never-mutated snapshot (see [DrawerHierarchy.categorize]), so this is honestly
+ * immutable: marking it lets a category tile skip recomposition when its own group is unchanged. */
+@Immutable
 data class CategoryGroup(val category: AppCategory, val apps: List<AppEntry>)
 
 /**

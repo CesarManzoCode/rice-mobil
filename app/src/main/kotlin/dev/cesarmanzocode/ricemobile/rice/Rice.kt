@@ -5,6 +5,7 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -14,6 +15,7 @@ import dev.cesarmanzocode.ricemobile.apps.CatalogStatus
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperSpec
 
 /** A favorite slot: [app] is null when the identity is temporarily unavailable (contract §5.2). */
+@Immutable
 data class FavoriteSlot(val key: AppKey, val app: AppEntry?)
 
 /**
@@ -27,6 +29,11 @@ fun buildFavoriteSlots(favoriteKeys: List<AppKey>, apps: List<AppEntry>): List<F
     return favoriteKeys.map { key -> FavoriteSlot(key = key, app = appsByKey[key]) }
 }
 
+/** All lists here are freshly-derived snapshots from [dev.cesarmanzocode.ricemobile.launcher.LauncherViewModel]
+ * and never mutated after construction, so this is honestly immutable — not just "probably fine"
+ * (contract perf: a rice's Home must be skippable when an unrelated part of launcher state, e.g.
+ * a toast or wallpaper status, changes but the home model itself did not). */
+@Immutable
 data class HomeModel(
     val favorites: List<FavoriteSlot>,
     val isDefaultHome: Boolean,
@@ -35,6 +42,8 @@ data class HomeModel(
     val recentApps: List<AppEntry> = emptyList(),
 )
 
+/** See [HomeModel] docs: same immutability guarantee applies here. */
+@Immutable
 data class DrawerModel(
     val query: String,
     val results: List<AppEntry>,
