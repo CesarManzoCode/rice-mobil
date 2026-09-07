@@ -1,12 +1,20 @@
 package dev.cesarmanzocode.ricemobile.rice.arctic
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -57,6 +66,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -78,11 +88,25 @@ import dev.cesarmanzocode.ricemobile.rice.DrawerHierarchy
 import dev.cesarmanzocode.ricemobile.rice.DrawerModel
 import dev.cesarmanzocode.ricemobile.rice.DrawerView
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
+import dev.cesarmanzocode.ricemobile.ui.shared.LocalReducedMotion
+import dev.cesarmanzocode.ricemobile.ui.shared.MotionTokens
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
+import dev.cesarmanzocode.ricemobile.ui.shared.ricePressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
 import kotlinx.coroutines.launch
+
+/** What the drawer's content area is currently showing, unified so the *same* [AnimatedContent]
+ * (interaction sprint §10, §11, §13) directs Browse<->Category, Browse<->AllApps *and*
+ * Browse<->SearchResults — never the "Crossfade used as a hammer" the sprint calls out. */
+private sealed interface DrawerContentKey {
+    data object Search : DrawerContentKey
+    data class Hierarchy(val view: DrawerView) : DrawerContentKey
+}
+
+private fun DrawerView.depth(): Int = if (this is DrawerView.Browse) 0 else 1
 
 /**
  * Arctic Drawer V2 (Sprint 3, mockup reconstruction): edge-to-edge (no floating rounded card —
@@ -96,6 +120,8 @@ import kotlinx.coroutines.launch
 fun ArcticDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = Modifier) {
     var view by remember { mutableStateOf<DrawerView>(DrawerView.Browse) }
     val searching = model.query.isNotEmpty()
+    val reducedMotion = LocalReducedMotion.current
+    val density = LocalDensity.current
     BackHandler(enabled = !searching && view != DrawerView.Browse) { view = DrawerView.Browse }
 
     Column(
@@ -137,22 +163,60 @@ fun ArcticDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = 
                 CatalogStatus.Ready -> {
                     if (model.results.isEmpty()) {
                         EmptyState(message = stringResource(R.string.catalog_empty), textColor = ARCTIC_SECONDARY)
-                    } else if (searching) {
-                        AppGrid(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
                     } else {
-                        Crossfade(targetState = view, animationSpec = tween(150), label = "arctic-drawer-view") { target ->
-                            when (target) {
-                                DrawerView.Browse -> BrowseView(
-                                    model = model,
-                                    onOpenCategory = { view = DrawerView.Category(it) },
-                                    onOpenAllApps = { view = DrawerView.AllApps },
-                                    actions = actions,
-                                )
-                                is DrawerView.Category -> {
-                                    val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == target.category }
-                                    AppGrid(entries = group?.apps.orEmpty(), favoriteKeys = model.favoriteKeys, actions = actions)
+                        val contentKey: DrawerContentKey = if (searching) DrawerContentKey.Search else DrawerContentKey.Hierarchy(view)
+                        AnimatedContent(
+                            targetState = contentKey,
+                            transitionSpec = {
+                                val searchChanged = (initialState is DrawerContentKey.Search) != (targetState is DrawerContentKey.Search)
+                                when {
+                                    reducedMotion -> fadeIn(tween(MotionTokens.Fast)) togetherWith fadeOut(tween(MotionTokens.Fast))
+                                    searchChanged -> {
+                                        // §13: only Browse<->SearchResults gets motion — typing more
+                                        // letters keeps the same key (Search), so results update in
+                                        // place with zero animation per keystroke.
+                                        val enteringSearch = targetState is DrawerContentKey.Search
+                                        val distancePx = with(density) { 6.dp.roundToPx() }
+                                        val enter = fadeIn(tween(MotionTokens.Fast)) +
+                                            slideInVertically(tween(MotionTokens.Fast)) { if (enteringSearch) distancePx else -distancePx }
+                                        val exit = fadeOut(tween(MotionTokens.Fast)) +
+                                            slideOutVertically(tween(MotionTokens.Fast)) { if (enteringSearch) -distancePx else distancePx }
+                                        enter togetherWith exit
+                                    }
+                                    else -> {
+                                        // §10/§11: Browse<->Category and Browse<->AllApps both "profundizar"
+                                        // via the same directional slide — the container moves, never the
+                                        // individual cells (§10: "no animar cada item individual").
+                                        val initialDepth = (initialState as? DrawerContentKey.Hierarchy)?.view?.depth() ?: 0
+                                        val targetDepth = (targetState as? DrawerContentKey.Hierarchy)?.view?.depth() ?: 0
+                                        val forward = targetDepth > initialDepth
+                                        val enterPx = with(density) { 24.dp.roundToPx() }
+                                        val exitPx = with(density) { 16.dp.roundToPx() }
+                                        val enter = fadeIn(tween(MotionTokens.Standard)) +
+                                            slideInHorizontally(tween(MotionTokens.Standard)) { if (forward) enterPx else -exitPx }
+                                        val exit = fadeOut(tween(MotionTokens.Standard)) +
+                                            slideOutHorizontally(tween(MotionTokens.Standard)) { if (forward) -exitPx else enterPx }
+                                        enter togetherWith exit
+                                    }
                                 }
-                                DrawerView.AllApps -> AllAppsView(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
+                            },
+                            label = "arctic-drawer-content",
+                        ) { key ->
+                            when (key) {
+                                DrawerContentKey.Search -> AppGrid(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
+                                is DrawerContentKey.Hierarchy -> when (val target = key.view) {
+                                    DrawerView.Browse -> BrowseView(
+                                        model = model,
+                                        onOpenCategory = { view = DrawerView.Category(it) },
+                                        onOpenAllApps = { view = DrawerView.AllApps },
+                                        actions = actions,
+                                    )
+                                    is DrawerView.Category -> {
+                                        val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == target.category }
+                                        AppGrid(entries = group?.apps.orEmpty(), favoriteKeys = model.favoriteKeys, actions = actions)
+                                    }
+                                    DrawerView.AllApps -> AllAppsView(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
+                                }
                             }
                         }
                     }
@@ -282,7 +346,9 @@ private fun AppRowSection(title: String, apps: List<AppEntry>, actions: RiceActi
 @Composable
 private fun AppRowTile(entry: AppEntry, actions: RiceActions) {
     Column(
-        modifier = Modifier.combinedClickable(
+        modifier = Modifier.ricePressable(
+            pressScale = RiceMotion.Arctic.pressScale,
+            pressMs = RiceMotion.Arctic.pressMs,
             onClick = { actions.openApp(entry.key) },
             onLongClick = { actions.showAppMenu(entry.key) },
         ),
@@ -415,7 +481,13 @@ private fun GridCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, 
     Column(
         modifier = Modifier
             .heightIn(min = 84.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = toggleLabel)
+            .ricePressable(
+                pressScale = RiceMotion.Arctic.pressScale,
+                pressMs = RiceMotion.Arctic.pressMs,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = toggleLabel,
+            )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -506,7 +578,9 @@ private fun AllAppsRow(entry: AppEntry, isFavorite: Boolean, actions: RiceAction
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .combinedClickable(
+            .ricePressable(
+                pressScale = RiceMotion.Arctic.pressScale,
+                pressMs = RiceMotion.Arctic.pressMs,
                 onClick = { actions.openApp(entry.key) },
                 onLongClick = { actions.showAppMenu(entry.key) },
                 onLongClickLabel = toggleLabel,
@@ -536,14 +610,34 @@ private fun ArcticSearchField(
     modifier: Modifier = Modifier,
 ) {
     val keyboardActions = rememberSearchKeyboardActions(resultCount, onSearchSingleResult)
+    val reducedMotion = LocalReducedMotion.current
+    var focused by remember { mutableStateOf(false) }
+    // §12: "field gana énfasis" on focus — a short (120-180ms) tint/border brighten, never a
+    // hard cut and never a slow decorative one.
+    val focusProgress by animateFloatAsState(
+        targetValue = if (focused) 1f else 0f,
+        animationSpec = if (reducedMotion) snap() else tween(160),
+        label = "search-focus",
+    )
+    val glowTint = lerp(ARCTIC_GLASS_TINT, ARCTIC_ACCENT, focusProgress * 0.5f)
+    val glowBorder = remember(focusProgress) {
+        Brush.verticalGradient(
+            listOf(
+                lerp(ARCTIC_BORDER_HI, ARCTIC_ACCENT, focusProgress),
+                lerp(ARCTIC_BORDER, ARCTIC_ACCENT.copy(alpha = 0.55f), focusProgress),
+            ),
+        )
+    }
     ArcticGlassSurface(
         modifier = modifier.heightIn(min = 54.dp),
         shape = RoundedCornerShape(50),
-        baseAlpha = 0.26f,
+        tint = glowTint,
+        baseAlpha = 0.26f + focusProgress * 0.08f,
+        borderBrush = glowBorder,
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            SearchGlyph(tint = ARCTIC_SECONDARY, modifier = Modifier.size(18.dp))
+            SearchGlyph(tint = lerp(ARCTIC_SECONDARY, ARCTIC_ACCENT, focusProgress), modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(12.dp))
             Box(modifier = Modifier.weight(1f)) {
                 BasicTextField(
@@ -554,7 +648,7 @@ private fun ArcticSearchField(
                     cursorBrush = SolidColor(ARCTIC_INK),
                     keyboardOptions = SearchImeOptions,
                     keyboardActions = keyboardActions,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
                     // fillMaxWidth, never fillMaxSize/fillMaxHeight: this field is a *non-weighted*
                     // first child of the outer Column, measured before the weighted catalog Box
                     // below it — a height-filling decoration here reproduces the exact bug fixed
