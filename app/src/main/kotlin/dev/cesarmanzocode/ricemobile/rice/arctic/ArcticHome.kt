@@ -37,18 +37,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.cesarmanzocode.ricemobile.R
+import dev.cesarmanzocode.ricemobile.apps.AppEntry
+import dev.cesarmanzocode.ricemobile.launcher.ClockProvider
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.HomeModel
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
+import dev.cesarmanzocode.ricemobile.system.BatterySnapshot
+import dev.cesarmanzocode.ricemobile.system.NextAlarmSnapshot
+import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
+import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
+import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberCurrentLocale
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberIs24HourFormat
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale
-import dev.cesarmanzocode.ricemobile.launcher.ClockProvider
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperBackdrop
 import java.time.format.FormatStyle
 
@@ -59,9 +65,12 @@ internal val ARCTIC_ACCENT = Color(0xFF78DCEF)
 internal val ARCTIC_GLASS = Color(0xE0142E42)
 internal val ARCTIC_BORDER = Color(0x2EFFFFFF)
 
-/** Arctic Home (contract §18.3): a light clock centered in the upper half, wide empty air, and a
- * floating glass dock near the thumb with an "Apps" pill above it and a discreet Rice circle
- * beside it in the same bottom row. */
+/**
+ * Arctic Home (approved mockup, Sprint 3 second pass): a light centered clock, the mockup's
+ * weather+agenda glass panel pair replaced with real data (battery/next alarm, and a recent-apps
+ * quick panel — never fabricated), and the same floating dock + Apps pill + Rice circle at the
+ * bottom. Panels keep the mockup's mass/position/materiality even though their content changed.
+ */
 @Composable
 fun ArcticHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
     HomeGestureSurface(
@@ -71,8 +80,10 @@ fun ArcticHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modi
     ) {
         WallpaperBackdrop(spec = ArcticGlassRice.wallpaper, modifier = Modifier.fillMaxSize())
         Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp)) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(28.dp))
             ClockPill(isDefaultHome = model.isDefaultHome, onRequestHome = actions.requestHomeRole)
+            Spacer(modifier = Modifier.height(20.dp))
+            GlassPanels(recentApps = model.recentApps, actions = actions)
             Spacer(modifier = Modifier.weight(1f))
             AppsPill(onClick = actions.openDrawer)
             Spacer(modifier = Modifier.height(12.dp))
@@ -114,6 +125,82 @@ private fun ClockPill(isDefaultHome: Boolean, onRequestHome: () -> Unit) {
                 fontSize = 13.sp,
                 modifier = Modifier.defaultMinSize(minHeight = 40.dp).padding(top = 8.dp).clickable(onClick = onRequestHome),
             )
+        }
+    }
+}
+
+/** The mockup's weather + agenda glass panel pair, filled with real data instead: battery/next
+ * alarm on one panel, a recent-apps quick panel on the other. Either panel — or the whole row —
+ * disappears when it has nothing true to show. */
+@Composable
+private fun GlassPanels(recentApps: List<AppEntry>, actions: RiceActions) {
+    val battery by rememberBatterySnapshot()
+    val alarm by rememberNextAlarmSnapshot()
+    val showGlance = battery != null || alarm != null
+    val showRecents = recentApps.isNotEmpty()
+    if (!showGlance && !showRecents) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (showGlance) GlancePanel(battery = battery, alarm = alarm)
+        if (showRecents) RecentsPanel(recentApps = recentApps, actions = actions)
+    }
+}
+
+@Composable
+private fun GlassPanel(modifier: Modifier = Modifier, content: @Composable Column.() -> Unit) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(ARCTIC_GLASS)
+            .border(1.dp, ARCTIC_BORDER, RoundedCornerShape(24.dp))
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun GlancePanel(battery: BatterySnapshot?, alarm: NextAlarmSnapshot?) {
+    val is24Hour = rememberIs24HourFormat()
+    val locale = rememberCurrentLocale()
+    GlassPanel {
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            battery?.let { snapshot ->
+                val suffix = if (snapshot.isCharging) " · ${stringResource(R.string.battery_charging)}" else ""
+                LabeledValue(label = stringResource(R.string.battery_label), value = "${snapshot.percent}%$suffix")
+            }
+            alarm?.let { snapshot ->
+                LabeledValue(label = stringResource(R.string.next_alarm_label), value = formatEpochTime(snapshot.triggerAtMillis, is24Hour, locale))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LabeledValue(label: String, value: String) {
+    Column {
+        Text(text = label.uppercase(), color = ARCTIC_SECONDARY, fontSize = 11.sp, letterSpacing = 0.5.sp)
+        Text(text = value, color = ARCTIC_INK, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+private fun RecentsPanel(recentApps: List<AppEntry>, actions: RiceActions) {
+    GlassPanel {
+        Text(text = stringResource(R.string.home_recent_title).uppercase(), color = ARCTIC_SECONDARY, fontSize = 11.sp, letterSpacing = 0.5.sp)
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            for (entry in recentApps.take(4)) {
+                Column(
+                    modifier = Modifier.combinedClickable(
+                        onClick = { actions.openApp(entry.key) },
+                        onLongClick = { actions.showAppMenu(entry.key) },
+                    ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AppIcon(entry = entry, size = 36.dp, plateShape = CircleShape, plateColor = Color(0x33FFFFFF))
+                }
+            }
         }
     }
 }
