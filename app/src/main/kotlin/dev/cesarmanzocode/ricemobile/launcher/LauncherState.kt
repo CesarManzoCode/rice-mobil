@@ -3,6 +3,7 @@ package dev.cesarmanzocode.ricemobile.launcher
 import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.apps.AppKey
 import dev.cesarmanzocode.ricemobile.apps.CatalogStatus
+import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.RiceId
 
 enum class LauncherScreen { Home, Drawer, RicePicker }
@@ -41,6 +42,9 @@ data class LauncherState(
     val results: List<AppEntry> = emptyList(),
     val favoriteKeys: List<AppKey> = emptyList(),
     val favorites: List<AppEntry> = emptyList(),
+    /** Precomputed by the ViewModel (contract perf §5): a rice's Home renders this directly
+     * instead of re-deriving it from [favoriteKeys]/[apps] on every recomposition. */
+    val favoriteSlots: List<FavoriteSlot> = emptyList(),
     val recentApps: List<AppEntry> = emptyList(),
     val appMenu: AppKey? = null,
     val isDefaultHome: Boolean = false,

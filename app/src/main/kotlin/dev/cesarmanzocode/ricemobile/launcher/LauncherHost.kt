@@ -192,7 +192,7 @@ fun LauncherHost(
                 when (key.screen) {
                     LauncherScreen.Home -> rice.Home(
                         model = HomeModel(
-                            favorites = viewModel.favoriteSlots(state),
+                            favorites = state.favoriteSlots,
                             isDefaultHome = state.isDefaultHome,
                             recentApps = state.recentApps,
                         ),

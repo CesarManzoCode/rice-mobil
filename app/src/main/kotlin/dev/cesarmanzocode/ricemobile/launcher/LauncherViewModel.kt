@@ -15,7 +15,6 @@ import dev.cesarmanzocode.ricemobile.preferences.PreferencesRepository
 import dev.cesarmanzocode.ricemobile.preferences.PreferencesSnapshot
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.RiceId
-import dev.cesarmanzocode.ricemobile.rice.buildFavoriteSlots
 import dev.cesarmanzocode.ricemobile.rice.RiceRegistry
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperController
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperControllerStatus
@@ -55,14 +54,46 @@ class LauncherViewModel(
     ) { snapshot, query -> snapshot.apps to query }
         .mapLatest { (apps, query) -> cooperativeFilter(apps, query) }
 
-    val uiState: StateFlow<LauncherState> = combine(
+    /**
+     * Everything derivable from catalog+preferences alone (contract perf §5: "ViewModel produce
+     * modelos ya listos"). Kept as its own combine stage so `appsByKey`/favorites/recents are
+     * recomputed only when the catalog or preferences actually change — not on every keystroke,
+     * screen navigation or wallpaper status tick, which would otherwise re-run this over the full
+     * app list on every [uiState] emission regardless of what changed.
+     */
+    private data class CatalogPrefsModel(
+        val catalog: CatalogSnapshot,
+        val prefsSnapshot: PreferencesSnapshot,
+        val favorites: List<AppEntry>,
+        val favoriteSlots: List<FavoriteSlot>,
+        val recentApps: List<AppEntry>,
+    )
+
+    private val catalogPrefsModel = combine(
         repository.catalog,
         preferencesRepository.snapshots,
+    ) { catalog, prefsSnapshot ->
+        val prefs = prefsSnapshot.preferences
+        val appsByKey = catalog.apps.associateBy { it.key }
+        CatalogPrefsModel(
+            catalog = catalog,
+            prefsSnapshot = prefsSnapshot,
+            favorites = prefs.favorites.mapNotNull { appsByKey[it] },
+            // A missing key becomes an unavailable slot rather than disappearing (contract §5.2).
+            favoriteSlots = prefs.favorites.map { key -> FavoriteSlot(key = key, app = appsByKey[key]) },
+            // Recents are a convenience shortcut, not a persisted identity contract: an uninstalled
+            // recent simply drops out (never rendered as an "unavailable" slot like a favorite).
+            recentApps = prefs.recentApps.mapNotNull { appsByKey[it] },
+        )
+    }
+
+    val uiState: StateFlow<LauncherState> = combine(
+        catalogPrefsModel,
         transient,
         searchResults,
         wallpaperController.status,
-    ) { catalog, prefsSnapshot, transientValue, results, wallpaperStatus ->
-        reduceToLauncherState(catalog, prefsSnapshot, transientValue, results, wallpaperStatus)
+    ) { base, transientValue, results, wallpaperStatus ->
+        reduceToLauncherState(base, transientValue, results, wallpaperStatus)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherState())
 
     private var launchInFlight = false
@@ -72,18 +103,13 @@ class LauncherViewModel(
     private var wallpaperCheckedThisForeground = false
 
     private fun reduceToLauncherState(
-        catalog: CatalogSnapshot,
-        prefsSnapshot: PreferencesSnapshot,
+        base: CatalogPrefsModel,
         transientValue: TransientState,
         results: List<AppEntry>,
         wallpaperStatus: WallpaperControllerStatus,
     ): LauncherState {
-        val prefs = prefsSnapshot.preferences
-        val appsByKey = catalog.apps.associateBy { it.key }
-        val favorites = prefs.favorites.mapNotNull { appsByKey[it] }
-        // Recents are a convenience shortcut, not a persisted identity contract: an uninstalled
-        // recent simply drops out (never rendered as an "unavailable" slot like a favorite).
-        val recentApps = prefs.recentApps.mapNotNull { appsByKey[it] }
+        val catalog = base.catalog
+        val prefs = base.prefsSnapshot.preferences
         return LauncherState(
             preferencesReady = true, // this reducer only runs once the preferences flow emitted.
             rice = prefs.rice,
@@ -93,11 +119,12 @@ class LauncherViewModel(
             query = transientValue.query,
             results = results,
             favoriteKeys = prefs.favorites,
-            favorites = favorites,
-            recentApps = recentApps,
+            favorites = base.favorites,
+            favoriteSlots = base.favoriteSlots,
+            recentApps = base.recentApps,
             appMenu = transientValue.appMenu,
             isDefaultHome = transientValue.isDefaultHome,
-            preferencesWritable = prefsSnapshot is PreferencesSnapshot.Ready,
+            preferencesWritable = base.prefsSnapshot is PreferencesSnapshot.Ready,
             wallpaperStatus = when (wallpaperStatus) {
                 WallpaperControllerStatus.Idle -> WallpaperStatus.Idle
                 is WallpaperControllerStatus.Applying -> WallpaperStatus.Applying
@@ -106,11 +133,6 @@ class LauncherViewModel(
             message = transientValue.message,
         )
     }
-
-    /** Builds the ordered favorite slots a [dev.cesarmanzocode.ricemobile.rice.Rice] renders;
-     * a missing key becomes an unavailable slot rather than disappearing (contract §5.2). */
-    fun favoriteSlots(state: LauncherState): List<FavoriteSlot> =
-        buildFavoriteSlots(state.favoriteKeys, state.apps)
 
     private suspend fun cooperativeFilter(apps: List<AppEntry>, query: String): List<AppEntry> {
         val tokens = AppSearch.tokensOf(query)
