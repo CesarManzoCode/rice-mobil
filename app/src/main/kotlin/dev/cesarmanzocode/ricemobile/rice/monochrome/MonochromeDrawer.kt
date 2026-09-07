@@ -1,6 +1,8 @@
 package dev.cesarmanzocode.ricemobile.rice.monochrome
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -94,18 +96,20 @@ fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifie
                     } else if (searching) {
                         FlatList(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
                     } else {
-                        when (val current = view) {
-                            DrawerView.Browse -> BrowseView(
-                                model = model,
-                                onOpenCategory = { view = DrawerView.Category(it) },
-                                onOpenAllApps = { view = DrawerView.AllApps },
-                                actions = actions,
-                            )
-                            is DrawerView.Category -> {
-                                val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == current.category }
-                                FlatList(entries = group?.apps.orEmpty(), favoriteKeys = model.favoriteKeys, actions = actions)
+                        Crossfade(targetState = view, animationSpec = tween(150), label = "monochrome-drawer-view") { target ->
+                            when (target) {
+                                DrawerView.Browse -> BrowseView(
+                                    model = model,
+                                    onOpenCategory = { view = DrawerView.Category(it) },
+                                    onOpenAllApps = { view = DrawerView.AllApps },
+                                    actions = actions,
+                                )
+                                is DrawerView.Category -> {
+                                    val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == target.category }
+                                    FlatList(entries = group?.apps.orEmpty(), favoriteKeys = model.favoriteKeys, actions = actions)
+                                }
+                                DrawerView.AllApps -> AllAppsView(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
                             }
-                            DrawerView.AllApps -> AllAppsView(entries = model.results, favoriteKeys = model.favoriteKeys, actions = actions)
                         }
                     }
                 }

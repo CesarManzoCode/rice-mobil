@@ -1,6 +1,8 @@
 package dev.cesarmanzocode.ricemobile.rice.ivory
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -85,25 +87,27 @@ fun IvoryDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = M
                             }
                         }
                     } else {
-                        when (val current = view) {
-                            DrawerView.Browse -> BrowseView(
-                                model = model,
-                                onOpenCategory = { view = DrawerView.Category(it) },
-                                onOpenAllApps = { view = DrawerView.AllApps },
-                                actions = actions,
-                            )
-                            is DrawerView.Category -> {
-                                val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == current.category }
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    CategoryHeader(title = stringResource(current.category.labelRes), onBack = { view = DrawerView.Browse })
-                                    LazyColumn(modifier = Modifier.weight(1f)) {
-                                        items(group?.apps.orEmpty(), key = { "${it.key.userSerial}:${it.key.component}" }) { entry ->
-                                            IndexRow(entry = entry, isFavorite = entry.key in model.favoriteKeys, indent = false, actions = actions)
+                        Crossfade(targetState = view, animationSpec = tween(150), label = "ivory-drawer-view") { target ->
+                            when (target) {
+                                DrawerView.Browse -> BrowseView(
+                                    model = model,
+                                    onOpenCategory = { view = DrawerView.Category(it) },
+                                    onOpenAllApps = { view = DrawerView.AllApps },
+                                    actions = actions,
+                                )
+                                is DrawerView.Category -> {
+                                    val group = DrawerHierarchy.categorize(model.results).firstOrNull { it.category == target.category }
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        CategoryHeader(title = stringResource(target.category.labelRes), onBack = { view = DrawerView.Browse })
+                                        LazyColumn(modifier = Modifier.weight(1f)) {
+                                            items(group?.apps.orEmpty(), key = { "${it.key.userSerial}:${it.key.component}" }) { entry ->
+                                                IndexRow(entry = entry, isFavorite = entry.key in model.favoriteKeys, indent = false, actions = actions)
+                                            }
                                         }
                                     }
                                 }
+                                DrawerView.AllApps -> AllAppsIndex(entries = model.results, favoriteKeys = model.favoriteKeys, onBack = { view = DrawerView.Browse }, actions = actions)
                             }
-                            DrawerView.AllApps -> AllAppsIndex(entries = model.results, favoriteKeys = model.favoriteKeys, onBack = { view = DrawerView.Browse }, actions = actions)
                         }
                     }
                 }
