@@ -1,5 +1,6 @@
 package dev.cesarmanzocode.ricemobile.rice.monochrome
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,11 +41,14 @@ import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.HomeModel
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
+import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
+import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockAmPm
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
+import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberCurrentLocale
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberIs24HourFormat
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale
@@ -57,9 +61,11 @@ internal val MONOCHROME_SECONDARY = Color(0xFFA3A3A0)
 internal val MONOCHROME_BORDER = Color(0xFF454545)
 
 /**
- * Monochrome Home (contract §18.2): a rigid start-aligned column, 24dp margins. An oversized
- * clock owns the top, a linear list of favorite rows owns the bottom, and the space between is
- * left deliberately empty — jerarquía por escala/tipo/espacio, no decoración.
+ * Monochrome Home (approved mockup, Sprint 3 second pass): a rigid start-aligned column with an
+ * oversized clock, a short editorial tagline, one compact real-data module (battery/next alarm —
+ * never fabricated), and a linear list of favorite rows at the bottom. The middle stays quiet on
+ * purpose, but is no longer *empty*: the glance module is the one piece of always-true content
+ * that fills the gap the mockup shows without inventing weather/media we don't have.
  */
 @Composable
 fun MonochromeHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
@@ -69,11 +75,11 @@ fun MonochromeHome(model: HomeModel, actions: RiceActions, modifier: Modifier = 
         modifier = modifier.fillMaxSize(),
     ) {
         WallpaperBackdrop(spec = MonochromeRice.wallpaper, modifier = Modifier.fillMaxSize())
-        Column(
-            modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp)) {
             ClockBlock(isDefaultHome = model.isDefaultHome, onRequestHome = actions.requestHomeRole)
+            Spacer(modifier = Modifier.padding(top = 20.dp))
+            GlanceModule()
+            Spacer(modifier = Modifier.weight(1f))
             FavoritesBlock(favorites = model.favorites, actions = actions)
         }
     }
@@ -105,8 +111,8 @@ private fun ClockBlock(isDefaultHome: Boolean, onRequestHome: () -> Unit) {
                 color = MONOCHROME_INK,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Black,
-                fontSize = 92.sp,
-                lineHeight = 96.sp,
+                fontSize = 88.sp,
+                lineHeight = 92.sp,
             )
             if (!is24Hour) {
                 Spacer(modifier = Modifier.width(10.dp))
@@ -130,6 +136,46 @@ private fun ClockBlock(isDefaultHome: Boolean, onRequestHome: () -> Unit) {
             fontFamily = FontFamily.Monospace,
             fontSize = 13.sp,
         )
+    }
+}
+
+/** A single compact, dark, horizontal module (mockup: the media-player-shaped block right under
+ * the clock) — filled with the one thing we can say honestly: battery and, when the system has
+ * one, the next alarm. Absent both, it disappears rather than showing an empty box. */
+@Composable
+private fun GlanceModule() {
+    val battery by rememberBatterySnapshot()
+    val alarm by rememberNextAlarmSnapshot()
+    if (battery == null && alarm == null) return
+    val is24Hour = rememberIs24HourFormat()
+    val locale = rememberCurrentLocale()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MONOCHROME_BORDER)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        battery?.let { snapshot ->
+            val chargingSuffix = if (snapshot.isCharging) " · ${stringResource(R.string.battery_charging).uppercase()}" else ""
+            Text(
+                text = "${stringResource(R.string.battery_label).uppercase()} ${snapshot.percent}%$chargingSuffix",
+                color = MONOCHROME_INK,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp,
+                letterSpacing = 0.5.sp,
+            )
+        }
+        alarm?.let { snapshot ->
+            if (battery != null) Spacer(modifier = Modifier.padding(top = 6.dp))
+            Text(
+                text = "${stringResource(R.string.next_alarm_label).uppercase()} · ${formatEpochTime(snapshot.triggerAtMillis, is24Hour, locale)}",
+                color = MONOCHROME_SECONDARY,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp,
+                letterSpacing = 0.5.sp,
+            )
+        }
     }
 }
 
