@@ -54,14 +54,25 @@ data class DrawerModel(
 )
 
 data class RiceActions(
+    /** Committed intent to be on the Drawer — a tap affordance calls this directly; the host
+     * always runs the same gesture-driven 0->1 settle before actually switching screens
+     * (interaction sprint §5: "debe iniciar inmediatamente la misma transición"). */
     val openDrawer: () -> Unit,
     val openPicker: () -> Unit,
+    /** Committed intent to be back on Home from the Drawer; same settle-then-switch treatment. */
     val goHome: () -> Unit,
     val updateQuery: (String) -> Unit,
     val openApp: (AppKey) -> Unit,
     val showAppMenu: (AppKey) -> Unit,
     val requestHomeRole: () -> Unit,
     val retryCatalog: () -> Unit,
+    /** Live Home->Drawer drag reporting (interaction sprint §3), additive to [openDrawer]: a rice
+     * wires these into its own swipe surface to make the Drawer follow the finger instead of only
+     * reacting once a threshold fires. Optional — a rice that never calls these simply never drives
+     * a live drag, and [openDrawer] alone still works (a plain, spring-settled 0->1 transition). */
+    val beginDrawerDrag: () -> Unit = {},
+    val dragDrawer: (deltaUpPx: Float) -> Unit = {},
+    val endDrawerDrag: (velocityUpPxPerSec: Float) -> Unit = {},
 )
 
 /** How a route (Drawer/Picker) enters relative to its final position (contract §10). */

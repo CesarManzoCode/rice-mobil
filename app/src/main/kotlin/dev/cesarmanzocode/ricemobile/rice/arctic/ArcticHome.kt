@@ -4,8 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -61,12 +59,13 @@ import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
 import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
+import dev.cesarmanzocode.ricemobile.ui.shared.LocalDrawerDragProgress
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
 import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
+import dev.cesarmanzocode.ricemobile.ui.shared.ricePressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberCurrentLocale
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberIs24HourFormat
-import dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperBackdrop
 import java.time.format.FormatStyle
 
@@ -98,12 +97,30 @@ internal val ARCTIC_ICON_PLATE = Color(0x3378DCEF)
  */
 @Composable
 fun ArcticHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
+    val dragProgress = LocalDrawerDragProgress.current
     HomeGestureSurface(
-        onSwipeUp = actions.openDrawer,
+        // The old fire-once threshold is fully superseded by the live drag below (interaction
+        // sprint §3): `onSwipeUp = {}` keeps HomeGestureSurface's own accumulator harmless-but-
+        // unused rather than double-driving the transition.
+        onSwipeUp = {},
         onLongPress = actions.openPicker,
+        onDragStart = actions.beginDrawerDrag,
+        onDrag = actions.dragDrawer,
+        onDragEnd = actions.endDrawerDrag,
         modifier = modifier.fillMaxSize(),
     ) {
-        WallpaperBackdrop(spec = ArcticGlassRice.wallpaper, modifier = Modifier.fillMaxSize())
+        // Wallpaper parallax (§27 "Arctic-specific motion"): a hair of extra scale + a small
+        // upward drift as the Drawer rises, cheap because it's the exact same graphicsLayer this
+        // Image already needed for nothing, never a re-decode.
+        WallpaperBackdrop(
+            spec = ArcticGlassRice.wallpaper,
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                val p = dragProgress()
+                scaleX = 1f + p * 0.05f
+                scaleY = 1f + p * 0.05f
+                translationY = -p * 14.dp.toPx()
+            },
+        )
         Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
             Spacer(modifier = Modifier.height(40.dp))
             ArcticClockBlock(isDefaultHome = model.isDefaultHome, onRequestHome = actions.requestHomeRole)
@@ -123,7 +140,12 @@ fun ArcticHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modi
             PageDots(onOpenDrawer = actions.openDrawer, modifier = Modifier.align(Alignment.CenterHorizontally))
             Spacer(modifier = Modifier.height(14.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(0.86f).align(Alignment.CenterHorizontally),
+                modifier = Modifier
+                    .fillMaxWidth(0.86f)
+                    .align(Alignment.CenterHorizontally)
+                    // "Dock puede bajar ligeramente" (§27): a few dp, never enough to read as its
+                    // own separate animation — it settles back with the very same drag/spring value.
+                    .graphicsLayer { translationY = dragProgress() * 10.dp.toPx() },
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -165,6 +187,9 @@ internal fun ArcticGlassSurface(
     baseAlpha: Float = 0.30f,
     elevated: Boolean = true,
     onClick: (() -> Unit)? = null,
+    // Override point for a caller that wants a brighter border without a whole new material (the
+    // search field's focus glow, §12) — every other call site keeps the shared default.
+    borderBrush: Brush = ARCTIC_BORDER_BRUSH,
     // Explicit rather than relying on constraint propagation: a caller with an unbounded max
     // height (e.g. a pill inside a LazyRow with no height of its own) can't safely centre its
     // content by giving that content fillMaxSize() — "no effect" is exactly what fillMax*
@@ -194,8 +219,14 @@ internal fun ArcticGlassSurface(
             )
             .clip(shape)
             .background(fillBrush)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .border(width = 1.dp, brush = ARCTIC_BORDER_BRUSH, shape = shape),
+            .then(
+                if (onClick != null) {
+                    Modifier.ricePressable(pressScale = RiceMotion.Arctic.pressScale, pressMs = RiceMotion.Arctic.pressMs, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .border(width = 1.dp, brush = borderBrush, shape = shape),
         contentAlignment = contentAlignment,
     ) {
         // matchParentSize (not fillMaxHeight(fraction)): the Box's own height comes from
@@ -361,7 +392,9 @@ private fun QuickAccessModule(apps: List<AppEntry>, onOpenAll: () -> Unit, actio
 @Composable
 private fun AppQuickTile(entry: AppEntry, actions: RiceActions) {
     Column(
-        modifier = Modifier.combinedClickable(
+        modifier = Modifier.ricePressable(
+            pressScale = RiceMotion.Arctic.pressScale,
+            pressMs = RiceMotion.Arctic.pressMs,
             onClick = { actions.openApp(entry.key) },
             onLongClick = { actions.showAppMenu(entry.key) },
         ),
@@ -391,7 +424,7 @@ private fun PageDots(onOpenDrawer: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clickable(onClick = onOpenDrawer)
+            .ricePressable(pressScale = RiceMotion.Arctic.pressScale, pressMs = RiceMotion.Arctic.pressMs, onClick = onOpenDrawer)
             .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
@@ -441,17 +474,14 @@ private fun ArcticDock(favorites: List<FavoriteSlot>, actions: RiceActions, modi
 
 @Composable
 private fun DockSlot(slot: FavoriteSlot, actions: RiceActions, modifier: Modifier = Modifier) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressScale by rememberPressScale(interactionSource, RiceMotion.Arctic.pressScale, RiceMotion.Arctic.pressMs)
     val app = slot.app
     val removeLabel = stringResource(R.string.action_remove_favorite)
     Column(
         modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
+            .ricePressable(
+                pressScale = RiceMotion.Arctic.pressScale,
+                pressMs = RiceMotion.Arctic.pressMs,
                 onClick = { app?.let { actions.openApp(it.key) } },
                 onLongClick = { actions.showAppMenu(slot.key) },
                 onLongClickLabel = removeLabel,
