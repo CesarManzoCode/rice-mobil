@@ -146,10 +146,16 @@ private fun quickAccessApps(model: HomeModel): List<AppEntry> {
 
 /**
  * Arctic's own glass material: a vertical tint gradient (never one flat alpha color), a soft
- * top-third highlight standing in for a specular sheen, a bright-to-dim border gradient, and a
- * short shadow for lift off the wallpaper. Shared by every Arctic surface — Home modules, dock,
- * and the Drawer panel/tiles — so the *material* is consistent without a shared visual widget
- * dictating layout (contract §16: "shared geometry: no").
+ * top-third highlight standing in for a specular sheen, a bright-to-dim border gradient, and
+ * (only for [elevated] surfaces) a short shadow for lift off the wallpaper. Shared by every
+ * Arctic surface — Home modules, dock, and the Drawer panel/tiles — so the *material* is
+ * consistent without a shared visual widget dictating layout (contract §16: "shared geometry: no").
+ *
+ * [elevated] defaults to true (the mockup's look for a standalone module), but a caller that
+ * repeats this surface many times at once in scrolling/grid content (chips, category tiles)
+ * should pass false: `Modifier.shadow` costs a RenderNode/outline pass per instance, and with a
+ * dozen of them on screen simultaneously that cost is paid every frame they're visible for no
+ * perceptible visual gain — the gradient fill + border already read as glass without it.
  */
 @Composable
 internal fun ArcticGlassSurface(
@@ -157,6 +163,7 @@ internal fun ArcticGlassSurface(
     shape: Shape = RoundedCornerShape(26.dp),
     tint: Color = ARCTIC_GLASS_TINT,
     baseAlpha: Float = 0.30f,
+    elevated: Boolean = true,
     onClick: (() -> Unit)? = null,
     // Explicit rather than relying on constraint propagation: a caller with an unbounded max
     // height (e.g. a pill inside a LazyRow with no height of its own) can't safely centre its
@@ -167,19 +174,28 @@ internal fun ArcticGlassSurface(
     contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    // Remembered rather than rebuilt on every recomposition of this surface (Brush allocation is
+    // cheap once, but this function is called for every visible glass tile/chip on screen).
+    val fillBrush = remember(tint, baseAlpha) {
+        Brush.verticalGradient(
+            0f to tint.copy(alpha = (baseAlpha + 0.12f).coerceAtMost(1f)),
+            0.55f to tint.copy(alpha = baseAlpha),
+            1f to tint.copy(alpha = (baseAlpha + 0.06f).coerceAtMost(1f)),
+        )
+    }
     Box(
         modifier = modifier
-            .shadow(elevation = 16.dp, shape = shape, clip = false, ambientColor = ARCTIC_SHADOW, spotColor = ARCTIC_SHADOW)
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    0f to tint.copy(alpha = (baseAlpha + 0.12f).coerceAtMost(1f)),
-                    0.55f to tint.copy(alpha = baseAlpha),
-                    1f to tint.copy(alpha = (baseAlpha + 0.06f).coerceAtMost(1f)),
-                ),
+            .then(
+                if (elevated) {
+                    Modifier.shadow(elevation = 16.dp, shape = shape, clip = false, ambientColor = ARCTIC_SHADOW, spotColor = ARCTIC_SHADOW)
+                } else {
+                    Modifier
+                },
             )
+            .clip(shape)
+            .background(fillBrush)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .border(width = 1.dp, brush = Brush.verticalGradient(listOf(ARCTIC_BORDER_HI, ARCTIC_BORDER)), shape = shape),
+            .border(width = 1.dp, brush = ARCTIC_BORDER_BRUSH, shape = shape),
         contentAlignment = contentAlignment,
     ) {
         // matchParentSize (not fillMaxHeight(fraction)): the Box's own height comes from
@@ -187,20 +203,19 @@ internal fun ArcticGlassSurface(
         // would silently no-op (Compose only honors a height fraction against a *bounded* max
         // height). The top-only sheen instead comes from where the gradient stops, not from the
         // overlay's measured size.
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = 0.16f),
-                        0.42f to Color.Transparent,
-                        1f to Color.Transparent,
-                    ),
-                ),
-        )
+        Box(modifier = Modifier.matchParentSize().background(ARCTIC_SHEEN_BRUSH))
         content()
     }
 }
+
+/** Constant across every glass surface regardless of [ArcticGlassSurface.tint]/[baseAlpha], so
+ * built once instead of once per call site (contract perf §10: "Brush remembered/cached"). */
+private val ARCTIC_BORDER_BRUSH = Brush.verticalGradient(listOf(ARCTIC_BORDER_HI, ARCTIC_BORDER))
+private val ARCTIC_SHEEN_BRUSH = Brush.verticalGradient(
+    0f to Color.White.copy(alpha = 0.16f),
+    0.42f to Color.Transparent,
+    1f to Color.Transparent,
+)
 
 @Composable
 private fun ArcticClockBlock(isDefaultHome: Boolean, onRequestHome: () -> Unit) {

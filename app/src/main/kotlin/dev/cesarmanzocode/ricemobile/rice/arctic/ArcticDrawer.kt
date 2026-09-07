@@ -227,11 +227,15 @@ private fun ChipRow(categories: List<CategoryGroup>, onSelectCategory: (AppCateg
 
 @Composable
 private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
+    // elevated = false: a LazyRow can have several chips visible/composed at once, and a per-chip
+    // drop shadow adds no perceptible depth at this size — the gradient fill + border already
+    // reads as glass (contract perf §11/§12: cheaper equivalent instead of removing the material).
     ArcticGlassSurface(
         modifier = Modifier.heightIn(min = 40.dp),
         shape = RoundedCornerShape(50),
         tint = if (selected) ARCTIC_ACCENT else ARCTIC_GLASS_TINT,
         baseAlpha = if (selected) 0.34f else 0.24f,
+        elevated = false,
         onClick = onClick,
         contentAlignment = Alignment.Center,
     ) {
@@ -313,10 +317,12 @@ private fun CategoryGrid(groups: List<CategoryGroup>, onClick: (AppCategory) -> 
 
 @Composable
 private fun CategoryTile(group: CategoryGroup, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    // elevated = false: up to 8 of these render at once in the categories grid — see Chip above.
     ArcticGlassSurface(
         modifier = modifier.heightIn(min = 76.dp, max = 88.dp),
         shape = RoundedCornerShape(20.dp),
         baseAlpha = 0.24f,
+        elevated = false,
         onClick = onClick,
     ) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
