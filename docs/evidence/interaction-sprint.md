@@ -22,6 +22,16 @@ sienta bien en el CUBOT KingKong X con un build real. Cuatro categorías, sin me
 
 No se declara "se siente mejor" en ningún punto de este documento sin esa etiqueta.
 
+Una pasada de revisión de código (misma sesión, antes de considerar esto terminado) encontró dos
+bugs reales en el mecanismo de `settleDrawer`/predictive-back de `LauncherHost.kt` — no cosméticos:
+uno hacía que cancelar el predictive-back del Drawer calculara el punto de partida del spring-back
+después de limpiar el flag de arrastre, leyendo el valor viejo en vez del vivo; el otro permitía que
+un `settleDrawer` en curso, superado por un segundo gesto antes de terminar, disparara igualmente su
+callback (`openDrawer`/`goHome`) y desincronizara la pantalla del estado del ViewModel. Ambos
+corregidos en el mismo sprint (commit `809def7`) — se documentan aquí para que quede explícito que
+la primera versión de este código, aunque compilaba en la lectura, tenía una condición de carrera
+real. Ver §2.3.
+
 ## 1. Auditoría de interacciones (Fase 1)
 
 Estado del código **antes** de este sprint (base `dfeaa65`). Todas las rutas pasan por
