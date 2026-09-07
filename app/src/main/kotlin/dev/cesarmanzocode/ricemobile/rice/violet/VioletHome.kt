@@ -35,15 +35,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.cesarmanzocode.ricemobile.R
+import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.launcher.ClockProvider
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.HomeModel
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
+import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
+import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
+import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberCurrentLocale
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberIs24HourFormat
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale
@@ -56,9 +60,13 @@ internal val VIOLET_INK = Color(0xFFF3EDFF)
 internal val VIOLET_SECONDARY = Color(0xFFC3B3D9)
 internal val VIOLET_ACCENT = Color(0xFFBC9BFF)
 
-/** Violet Home (contract §18.6): the wallpaper owns most of the plane, a small/medium clock sits
- * end-aligned in the top corner, and favorites form a 1-2-2 cluster in the lower half — a
- * principal node at center, two staggered pairs below it. */
+/**
+ * Violet Home (approved mockup, Sprint 3 second pass): the wallpaper stays the protagonist, the
+ * clock keeps its small end-aligned corner, and the mockup's music hero module is now a real
+ * hero card — most-recent local app front and center, battery/next alarm as a compact overline —
+ * same size/position/materiality as the mockup, never fabricated media. The 1-2-2 favorites
+ * cluster and footer are unchanged.
+ */
 @Composable
 fun VioletHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
     HomeGestureSurface(
@@ -71,6 +79,8 @@ fun VioletHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modi
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 ClockBlock(isDefaultHome = model.isDefaultHome, onRequestHome = actions.requestHomeRole)
             }
+            Spacer(modifier = Modifier.weight(0.6f))
+            HeroModule(recentApps = model.recentApps, actions = actions)
             Spacer(modifier = Modifier.weight(1f))
             Cluster(favorites = model.favorites, actions = actions)
             Spacer(modifier = Modifier.padding(top = 20.dp))
@@ -104,6 +114,67 @@ private fun ClockBlock(isDefaultHome: Boolean, onRequestHome: () -> Unit) {
                 fontSize = 12.sp,
                 modifier = Modifier.defaultMinSize(minHeight = 40.dp).padding(top = 6.dp).clickable(onClick = onRequestHome),
             )
+        }
+    }
+}
+
+/** Same mass/position as the mockup's music card: a large violet panel with the most recent app
+ * front and center and a compact battery/alarm overline — real data only, hidden if there's
+ * truly nothing (no history yet and no battery reading, which will not happen on a real device). */
+@Composable
+private fun HeroModule(recentApps: List<AppEntry>, actions: RiceActions) {
+    val battery by rememberBatterySnapshot()
+    val alarm by rememberNextAlarmSnapshot()
+    val mostRecent = recentApps.firstOrNull()
+    if (mostRecent == null && battery == null && alarm == null) return
+    val is24Hour = rememberIs24HourFormat()
+    val locale = rememberCurrentLocale()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(VIOLET_VIOLET.copy(alpha = 0.55f))
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+    ) {
+        if (battery != null || alarm != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                battery?.let { snapshot ->
+                    val suffix = if (snapshot.isCharging) " · ${stringResource(R.string.battery_charging)}" else ""
+                    Text(text = "${snapshot.percent}%$suffix", color = VIOLET_SECONDARY, fontSize = 12.sp)
+                }
+                alarm?.let { snapshot ->
+                    Text(text = formatEpochTime(snapshot.triggerAtMillis, is24Hour, locale), color = VIOLET_SECONDARY, fontSize = 12.sp)
+                }
+            }
+            if (mostRecent != null) Spacer(modifier = Modifier.padding(top = 12.dp))
+        }
+        if (mostRecent != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(entry = mostRecent, size = 52.dp, plateShape = RoundedCornerShape(16.dp), plateColor = VIOLET_INDIGO.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.padding(start = 14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = stringResource(R.string.home_recent_title).uppercase(), color = VIOLET_SECONDARY, fontSize = 11.sp, letterSpacing = 0.5.sp)
+                    Text(
+                        text = mostRecent.label,
+                        color = VIOLET_INK,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        .clip(CircleShape)
+                        .background(VIOLET_ACCENT.copy(alpha = 0.25f))
+                        .clickable { actions.openApp(mostRecent.key) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = "▶", color = VIOLET_ACCENT, fontSize = 14.sp)
+                }
+            }
         }
     }
 }
