@@ -1,40 +1,32 @@
 # Sprint 2 — Rice Engine + Persistencia — Evidencia
 
-**Branch:** `feat/rice-engine`
-**Entorno de ejecución:** sesión remota (Claude Code on the web), sin teléfono físico ni Android SDK/red completa en el contenedor.
+**Branch:** `feat/rice-engine` (integrado en `main`)
+**Entorno de escritura del código:** sesión remota (Claude Code on the web), sin teléfono físico ni Android SDK/red completa en el contenedor.
+**Entorno de validación real:** Arch Linux del usuario + teléfono físico CUBOT KINGKONG X, ejecutado localmente por el usuario después de la integración a `main`.
 
-## 1. Limitación real de entorno (idéntica a Sprint 1, no del contrato)
+## 1. Limitación del sandbox remoto (no cambia entre sprints)
 
-Este sandbox sigue sin Android SDK/`adb` y su política de red sigue bloqueando `dl.google.com` (y `maven.google.com`/`plugins.gradle.org` cuando redirigen ahí) con `403`, que es de donde resuelven tanto el plugin AGP como cualquier artefacto `androidx.*`. Se repitió la comprobación en esta sesión:
+El sandbox de esta sesión sigue sin Android SDK/`adb` y su política de red sigue bloqueando `dl.google.com` (y `maven.google.com`/`plugins.gradle.org` cuando redirigen ahí), que es de donde resuelven tanto el plugin AGP como cualquier artefacto `androidx.*`. Por eso el build/test/lint/assembleDebug de Sprint 2 no se pudieron ejecutar dentro de esta sesión remota — ver el detalle que ya quedó registrado en el momento de la implementación. Esa limitación es del entorno de escritura, no del código ni del producto.
 
-```
-$ ./gradlew --version
-# OK — Gradle 9.5.0 se descarga y arranca correctamente (services.gradle.org no está bloqueado).
+## 1bis. Validación real ejecutada por el usuario (Arch + CUBOT KINGKONG X)
 
-$ ./gradlew test
-FAILURE: Build failed with an exception.
-* Where: Build file '/home/user/rice-mobil/build.gradle.kts' line: 7
-* What went wrong:
-Plugin [id: 'com.android.application', version: '9.3.2', apply: false] was not found in any of the following sources:
-...
-BUILD FAILED in 23s
-```
+El usuario ejecutó la validación completa de Sprint 2 en su máquina Arch Linux contra el teléfono físico CUBOT KINGKONG X, fuera de este sandbox. Resultados reportados directamente por el usuario:
 
-**Consecuencia:** `./gradlew :app:dependencies --write-locks`, `./gradlew test`, `./gradlew lint` y `./gradlew assembleDebug` **no se pudieron ejecutar en esta sesión**, igual que en Sprint 1. No se declara `PASS` para ninguno de ellos aquí. El código se revisó manualmente con la mayor atención posible (balance de llaves/paréntesis por archivo, imports cruzados, firmas de contrato) pero eso no sustituye una compilación real.
+| Comando/escenario | Resultado |
+|---|---|
+| `./gradlew test` | **PASS**, después de un fix de scheduling en `WallpaperSequencingTest` (uso de `runCurrent()` para sincronizar el consumidor conflated antes de aserciones; ya presente en el código de `main`). |
+| `./gradlew lint` | **PASS** |
+| `./gradlew assembleDebug` | **PASS** |
+| `adb install -r app/build/outputs/apk/debug/app-debug.apk` | **PASS** |
+| Cambio entre los cinco rices (Monochrome/Arctic/Ember/Ivory/Violet) | **PASS** — estructura cambia visiblemente al seleccionar cada rice. |
+| Favoritos (añadir/quitar) | **PASS** |
+| Apertura de un favorito | **PASS** |
+| Persistencia (rice y favoritos sobreviven relanzar la app) | **PASS** |
+| Funcionalidad previa de Sprint 1 (drawer, búsqueda, apertura general, Home) | **PASS** — sin regresión. |
 
-**Pendiente explícito para el usuario en su Arch:**
+El usuario confirma que, funcionalmente, el gate físico de Sprint 2 se considera cumplido en ese dispositivo. No se dispone de la salida exacta de consola de esos comandos ni de capturas/logs adjuntos a esta sesión, así que este documento no la transcribe; se registra únicamente el resultado reportado por escenario, tal como fue comunicado.
 
-```bash
-git fetch origin feat/rice-engine
-git switch feat/rice-engine
-./gradlew :app:dependencies --write-locks
-./gradlew test
-./gradlew lint
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-El lockfile de Gradle (`dependencyLocking`) tampoco pudo regenerarse aquí por el mismo bloqueo de red; queda pendiente el primer `--write-locks` real con DataStore ya en las dependencias (§2.3 del contrato).
+No todas las filas de la matriz original de 9 escenarios (§3) recibieron una confirmación explícita independiente por parte del usuario en esta ronda (por ejemplo el límite de sexto favorito rechazado, el slot "no disponible" tras desinstalar, o el cambio rápido A→B→C→D terminando en el rice/wallpaper vigente). Esas quedan marcadas por separado abajo como pendientes de una pasada dedicada; no se infieren como `PASS` a partir de las pruebas generales reportadas. Sprint 3 vuelve a ejercitar estos mismos escenarios (D05/D06/D11) sobre los cinco diseños terminados, así que se revalidan de todas formas.
 
 ## 2. Qué se implementó (verificable por lectura, no por build en esta sesión)
 
@@ -79,31 +71,32 @@ El lockfile de Gradle (`dependencyLocking`) tampoco pudo regenerarse aquí por e
 
 ## 3. Gate físico Sprint 2 (matriz del prompt)
 
-**Estado: PENDING — PHYSICAL DEVICE VALIDATION**, igual que Sprint 1 hasta que el usuario lo ejecute en su Arch/CUBOT KINGKONG X:
+**Estado: FUNCIONALMENTE VALIDADO** por el usuario en Arch + CUBOT KINGKONG X (ver §1bis); las filas específicas de la matriz original de 9 escenarios que no recibieron confirmación dedicada quedan explícitas como pendientes de una pasada puntual, no como fallidas:
 
 | # | Escenario | Estado |
 |---|---|---|
-| 1 | Monochrome → Arctic cambia estructura | No ejecutada |
-| 2 | Arctic → Ember cambia estructura | No ejecutada |
-| 3 | Matar proceso → reabrir → Ember sigue seleccionado | No ejecutada |
-| 4 | Añadir favorito → cambiar rice → sigue favorito | No ejecutada |
-| 5 | Reiniciar proceso → favorito y orden persisten | No ejecutada |
-| 6 | Añadir cinco → intentar sexto → sin cambios | No ejecutada |
-| 7 | Desinstalar favorito → slot unavailable removible | No ejecutada |
-| 8 | Cambio rápido Mono→Arctic→Ember→Violet → Violet + su wallpaper | No ejecutada |
-| 9 | Sprint 1 sigue funcionando (drawer/búsqueda/abrir/Home) | No ejecutada |
+| 1 | Monochrome → Arctic cambia estructura | **PASS** (cambio entre los cinco rices confirmado) |
+| 2 | Arctic → Ember cambia estructura | **PASS** (cambio entre los cinco rices confirmado) |
+| 3 | Matar proceso → reabrir → Ember sigue seleccionado | **PASS** (persistencia confirmada de forma general) |
+| 4 | Añadir favorito → cambiar rice → sigue favorito | **PASS** (favoritos + persistencia confirmados) |
+| 5 | Reiniciar proceso → favorito y orden persisten | **PASS** (persistencia confirmada) |
+| 6 | Añadir cinco → intentar sexto → sin cambios | Pendiente de pasada dedicada — no ejercitado explícitamente en esta ronda; cubierto por `FavoriteRulesTest` en `test`. Se revalida en el gate físico de Sprint 3 (D05). |
+| 7 | Desinstalar favorito → slot unavailable removible | Pendiente de pasada dedicada — no ejercitado explícitamente en esta ronda. Se revalida en Sprint 3/4 (D07). |
+| 8 | Cambio rápido Mono→Arctic→Ember→Violet → Violet + su wallpaper | Pendiente de pasada dedicada — el cambio general de rice pasó, pero la secuencia rápida específica no se reportó por separado. Se revalida en el gate físico de Sprint 3 (D11). |
+| 9 | Sprint 1 sigue funcionando (drawer/búsqueda/abrir/Home) | **PASS** (confirmado explícitamente por el usuario) |
 
-Ninguna fila se declara `PASS` sin dispositivo real.
+`test`, `lint` y `assembleDebug` PASS reales del usuario; APK instalada por `adb` y usada en dispositivo. Ninguna fila anterior se marca `PASS` sin ese reporte directo del usuario.
 
 ## 4. Desviaciones reales del contrato
 
 - **Motion (§10):** `Rice.motion` existe con los tiempos de entrada/salida de drawer del contrato, pero el host todavía no los usa para animar (`AnimatedContent`/easing/`PredictiveBackHandler`); eso es explícitamente polish de Sprint 3, y S2 pidió sólo la estructura de la interfaz. Documentado, no oculto.
-- **Lockfile:** no se pudo regenerar `dependencyLocking` con `--write-locks` en este sandbox (mismo bloqueo de red que Sprint 1); pendiente en el entorno del usuario.
-- **Sin build/test/lint reales ejecutados aquí:** ver §1. Todo lo demás sigue el contrato §15 en el orden indicado, sin ampliar scope (nada de Room, Navigation Compose, Hilt, widgets, folders, drag, icon packs, settings generales, ni trabajo de Sprint 3).
+- **Lockfile:** no se pudo regenerar `dependencyLocking` con `--write-locks` en el sandbox remoto (bloqueo de red descrito en §1); el usuario ejecutó `test`/`lint`/`assembleDebug` con éxito en su entorno local, que sí resuelve dependencias.
+- **Build/test/lint dentro de esta sesión remota:** nunca se pudieron ejecutar aquí (§1); la evidencia real proviene enteramente de la ejecución local del usuario (§1bis), no de este sandbox.
 
-## 5. Pendientes concretos antes de mergear Sprint 2
+## 5. Cierre de Sprint 2
 
-1. Ejecutar en el Arch del usuario: `./gradlew :app:dependencies --write-locks`, `./gradlew test`, `./gradlew lint`, `./gradlew assembleDebug`.
-2. Instalar el APK debug e correr la matriz física de 9 escenarios de este documento (equivalente a D05/D06/D11 + regresión D01 del contrato).
-3. Confirmar en dispositivo real que wallpaper se aplica (`FLAG_SYSTEM`) y que el lock screen no se ve afectado, según §8.
-4. Revisar warnings reales de `lint`/compilador una vez que el build corra (no verificado aquí).
+Sprint 2 se considera funcionalmente cerrado: `test`/`lint`/`assembleDebug` PASS reales, APK instalada, y el motor de rices/persistencia validado en dispositivo físico por el usuario (§1bis, §3). Quedan como pendientes explícitos, no bloqueantes para avanzar a Sprint 3, y se revalidan dentro de su propio gate físico:
+
+1. Pasada dedicada de los escenarios #6 (sexto favorito rechazado), #7 (slot unavailable tras desinstalar) y #8 (cambio rápido de rice terminando en el vigente) de la matriz de §3 — cubiertos por Sprint 3 D05/D07/D11.
+2. Confirmación explícita en dispositivo de que el wallpaper se aplica con `FLAG_SYSTEM` sin afectar el lock screen (§8) — Sprint 3 reemplaza los assets provisionales por los definitivos y vuelve a ejercitar esto.
+3. Revisión de warnings reales de `lint`/compilador más allá del PASS binario reportado (no se dispone de la salida completa en esta sesión).
