@@ -4,6 +4,7 @@ import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.intl.LocalLocale
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -25,10 +26,7 @@ fun rememberIs24HourFormat(): Boolean {
 }
 
 @Composable
-fun rememberCurrentLocale(): Locale {
-    val configuration = LocalConfiguration.current
-    return configuration.locales.get(0) ?: Locale.getDefault()
-}
+fun rememberCurrentLocale(): Locale = LocalLocale.current.platformLocale
 
 /** "14:07" (24h) or "2:07" (12h, no leading zero — contract §18.2 allows AM/PM separately). */
 fun formatClockTime(now: ZonedDateTime, is24Hour: Boolean, locale: Locale): String {
