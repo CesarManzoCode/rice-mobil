@@ -10,15 +10,16 @@ import dev.cesarmanzocode.ricemobile.rice.RiceId
 import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperSpec
 
-/** Structure: Home favorites in a matrix/block grid; Drawer is two columns of compact rows. */
+/** Industrial matrix (contract §18.4): a compressed two-column header, favorites as 1+2x2 blocks
+ * with cut corners, and a dense two-column Drawer of compact horizontal rows. */
 object EmberForgeRice : Rice {
     override val id = RiceId.EmberForge
     override val wallpaper = WallpaperSpec(
-        assetPath = "wallpapers/ember_forge.png",
-        assetRevision = 1,
-        fallbackColorArgb = 0xFF241512L,
+        assetPath = "wallpapers/ember_forge.webp",
+        assetRevision = 2,
+        fallbackColorArgb = 0xFF171411L,
     )
-    override val motion = RiceMotion(drawerEnterMs = 170, drawerExitMs = 140)
+    override val motion = RiceMotion.Ember
     override val lightSystemBars = false
 
     @Composable
