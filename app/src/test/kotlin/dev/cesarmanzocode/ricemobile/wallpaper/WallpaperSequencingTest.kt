@@ -2,7 +2,7 @@ package dev.cesarmanzocode.ricemobile.wallpaper
 
 import dev.cesarmanzocode.ricemobile.rice.RiceId
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,13 +31,14 @@ class WallpaperSequencingTest {
         )
 
         controller.request(RiceId.Monochrome, spec("A"))
-        advanceUntilIdle() // consumer picks up A and blocks inside writer.write
+        runCurrent() // consumer picks up A and blocks inside writer.write
 
         controller.request(RiceId.ArcticGlass, spec("B"))
         controller.request(RiceId.EmberForge, spec("C")) // conflates over B: never written
+        runCurrent() // nothing runnable yet: consumer is still parked on releaseA.await()
 
         releaseA.complete(Unit)
-        advanceUntilIdle()
+        runCurrent() // A's write completes, then the consumer drains straight to C
 
         assertEquals(listOf("A", "C"), written)
         assertEquals(
@@ -57,7 +58,7 @@ class WallpaperSequencingTest {
         )
 
         controller.request(RiceId.Monochrome, spec("A"))
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(0, appliedCalls)
         assertEquals(WallpaperControllerStatus.Failed(RiceId.Monochrome), controller.status.value)
@@ -74,7 +75,7 @@ class WallpaperSequencingTest {
         )
 
         controller.request(RiceId.Monochrome, spec("A"))
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(0, appliedCalls)
     }
