@@ -1,6 +1,7 @@
 package dev.cesarmanzocode.ricemobile.ui.shared
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -9,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,7 +26,14 @@ import androidx.compose.ui.unit.dp
 import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.apps.IconKey
 import dev.cesarmanzocode.ricemobile.apps.IconLoader
-import androidx.compose.foundation.Image
+
+/**
+ * Provided once by the host (contract §6.1: `Rice.Home`/`Drawer` take only models/actions, no
+ * services), so every rice can render icons without threading an [IconLoader] through models.
+ */
+val LocalIconLoader = compositionLocalOf<IconLoader> {
+    error("LocalIconLoader not provided: wrap content in LauncherHost")
+}
 
 /**
  * Decorative when the label is already visible next to it (contentDescription=null avoids
@@ -34,10 +43,10 @@ import androidx.compose.foundation.Image
 @Composable
 fun AppIcon(
     entry: AppEntry,
-    iconLoader: IconLoader,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
 ) {
+    val iconLoader = LocalIconLoader.current
     val density = LocalDensity.current
     val context = LocalContext.current
     val sizePx = with(density) { size.roundToPx() }

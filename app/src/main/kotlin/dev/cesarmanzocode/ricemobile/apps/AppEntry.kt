@@ -9,6 +9,10 @@ data class AppKey(
     val component: String, // ComponentName.flattenToString(), never flattenToShortString.
 )
 
+/** Package name derived from [AppKey.component] for an unavailable favorite slot (§5.2). */
+val AppKey.packageNameGuess: String
+    get() = component.substringBefore('/', missingDelimiterValue = component)
+
 data class AppEntry(
     val key: AppKey,
     val packageName: String,

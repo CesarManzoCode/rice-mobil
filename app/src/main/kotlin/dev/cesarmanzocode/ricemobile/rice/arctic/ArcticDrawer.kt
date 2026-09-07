@@ -1,23 +1,22 @@
-package dev.cesarmanzocode.ricemobile.rice.monochrome
+package dev.cesarmanzocode.ricemobile.rice.arctic
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -30,14 +29,22 @@ import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchField
 
-private val MONOCHROME_BACKGROUND = Color(0xFF0A0A0A)
-private val MONOCHROME_INK = Color(0xFFF5F5F0)
+private val ARCTIC_BACKGROUND = Color(0xFFD8E6EE)
+private val ARCTIC_INK = Color(0xFF1E2A30)
+private val ARCTIC_PANEL = Color(0xB3FFFFFF)
 
-/** Monochrome Drawer structure: a single list (contract prompt). */
+/** Arctic Glass Drawer structure: a grid of apps inside a floating panel (contract prompt). */
 @Composable
-fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxSize().background(MONOCHROME_BACKGROUND).safeDrawingPadding()) {
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+fun ArcticDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxSize().background(ARCTIC_BACKGROUND).safeDrawingPadding().padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(ARCTIC_PANEL)
+                .padding(12.dp),
+        ) {
             when (model.status) {
                 CatalogStatus.Loading -> EmptyState(message = stringResource(R.string.catalog_loading))
                 is CatalogStatus.Failed -> EmptyState(
@@ -49,9 +56,9 @@ fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifie
                     if (model.results.isEmpty()) {
                         EmptyState(message = stringResource(R.string.catalog_empty))
                     } else {
-                        LazyColumn {
+                        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 84.dp)) {
                             items(model.results, key = { "${it.key.userSerial}:${it.key.component}" }) { entry ->
-                                AppRow(
+                                GridCell(
                                     entry = entry,
                                     isFavorite = entry.key in model.favoriteKeys,
                                     onClick = { actions.openApp(entry.key) },
@@ -68,27 +75,20 @@ fun MonochromeDrawer(model: DrawerModel, actions: RiceActions, modifier: Modifie
             onQueryChange = actions.updateQuery,
             resultCount = model.results.size,
             onSearchSingleResult = { model.results.singleOrNull()?.let { actions.openApp(it.key) } },
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
     }
 }
 
 @Composable
-private fun AppRow(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
-    Row(
+private fun GridCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(8.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AppIcon(entry = entry, size = 36.dp)
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(text = entry.label, color = MONOCHROME_INK)
-        if (isFavorite) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "★", color = MONOCHROME_INK)
-        }
+        AppIcon(entry = entry, size = 44.dp)
+        Text(text = (if (isFavorite) "★ " else "") + entry.label, color = ARCTIC_INK)
     }
 }
