@@ -61,4 +61,6 @@
     <string name="home_recent_title">Recientes</string>
     <string name="ivory_hoy_title">Hoy</string>
     <string name="ivory_tagline">Un día enfocado también es un día pleno.</string>
+    <string name="ember_focus_tagline">Disciplina hoy. Un mejor mañana.</string>
+    <string name="ember_quick_access">ACCESO RÁPIDO</string>
 </resources>

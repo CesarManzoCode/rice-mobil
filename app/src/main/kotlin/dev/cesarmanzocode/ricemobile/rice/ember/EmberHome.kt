@@ -36,15 +36,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.cesarmanzocode.ricemobile.R
+import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.apps.IconTreatment
 import dev.cesarmanzocode.ricemobile.launcher.ClockProvider
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.HomeModel
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
+import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
+import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberCurrentLocale
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberIs24HourFormat
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperBackdrop
@@ -58,9 +62,11 @@ internal val EMBER_SECONDARY = Color(0xFFC0ABA0)
 internal val EMBER_CUT = CutCornerShape(6.dp)
 
 /**
- * Ember Home (contract §18.4): a compressed two-column header (hour | copper rule | date), a
- * short air gap, then favorites as a matrix — first block full width, the rest a 2-column grid
- * with cut corners. No card shadows, no glow.
+ * Ember Home (approved mockup, Sprint 3 second pass): a compressed header, a dashboard of two
+ * small real-data blocks (battery + next alarm — the mockup's card pair), a wide "acceso rápido"
+ * block built from local recent-app history (replacing the mockup's music card, never fabricated
+ * media), the favorites matrix, and a clear "todas las apps" trigger. Denser and more dashboard-
+ * shaped than the previous pass, matching the mockup's industrial-panel feel.
  */
 @Composable
 fun EmberHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
@@ -72,9 +78,13 @@ fun EmberHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modif
         WallpaperBackdrop(spec = EmberForgeRice.wallpaper, modifier = Modifier.fillMaxSize())
         Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(20.dp)) {
             HeaderRow(isDefaultHome = model.isDefaultHome, onRequestHome = actions.requestHomeRole)
-            Spacer(modifier = Modifier.height(28.dp))
-            FavoritesMatrix(favorites = model.favorites, actions = actions)
+            Spacer(modifier = Modifier.height(20.dp))
+            GlanceRow()
+            Spacer(modifier = Modifier.height(10.dp))
+            QuickAccessBlock(recentApps = model.recentApps, actions = actions)
             Spacer(modifier = Modifier.weight(1f))
+            FavoritesMatrix(favorites = model.favorites, actions = actions)
+            Spacer(modifier = Modifier.height(16.dp))
             TriggerBar(actions = actions)
         }
     }
@@ -85,32 +95,130 @@ private fun HeaderRow(isDefaultHome: Boolean, onRequestHome: () -> Unit) {
     val now by ClockProvider.rememberNow()
     val is24Hour = rememberIs24HourFormat()
     val locale = rememberCurrentLocale()
-    Row(verticalAlignment = Alignment.Bottom) {
-        Text(
-            text = formatClockTime(now, is24Hour, locale),
-            color = EMBER_INK,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 50.sp,
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Box(modifier = Modifier.width(3.dp).height(36.dp).background(EMBER_COPPER))
-        Spacer(modifier = Modifier.width(14.dp))
-        Column {
+    Column {
+        Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                text = formatClockDate(now, locale, FormatStyle.SHORT),
-                color = EMBER_SECONDARY,
+                text = formatClockTime(now, is24Hour, locale),
+                color = EMBER_INK,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontSize = 48.sp,
             )
-            if (!isDefaultHome) {
+            Spacer(modifier = Modifier.width(14.dp))
+            Box(modifier = Modifier.width(3.dp).height(34.dp).background(EMBER_COPPER))
+            Spacer(modifier = Modifier.width(14.dp))
+            Column {
                 Text(
-                    text = stringResource(R.string.action_use_as_home),
-                    color = EMBER_COPPER,
+                    text = formatClockDate(now, locale, FormatStyle.SHORT),
+                    color = EMBER_SECONDARY,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    modifier = Modifier.defaultMinSize(minHeight = 24.dp).clickable(onClick = onRequestHome),
+                    fontSize = 13.sp,
                 )
+                if (!isDefaultHome) {
+                    Text(
+                        text = stringResource(R.string.action_use_as_home),
+                        color = EMBER_COPPER,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        modifier = Modifier.defaultMinSize(minHeight = 24.dp).clickable(onClick = onRequestHome),
+                    )
+                }
+            }
+        }
+        Text(
+            text = stringResource(R.string.ember_focus_tagline),
+            color = EMBER_SECONDARY,
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+    }
+}
+
+/** The mockup's two small cards (battery, next event) filled with real data; a card is simply
+ * absent when its data isn't available, and the row disappears if neither applies. */
+@Composable
+private fun GlanceRow() {
+    val battery by rememberBatterySnapshot()
+    val alarm by rememberNextAlarmSnapshot()
+    if (battery == null && alarm == null) return
+    val is24Hour = rememberIs24HourFormat()
+    val locale = rememberCurrentLocale()
+
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        battery?.let { snapshot ->
+            val suffix = if (snapshot.isCharging) " · ${stringResource(R.string.battery_charging)}" else ""
+            GlanceCard(
+                title = stringResource(R.string.battery_label),
+                value = "${snapshot.percent}%",
+                caption = suffix.removePrefix(" · "),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        alarm?.let { snapshot ->
+            GlanceCard(
+                title = stringResource(R.string.next_alarm_label),
+                value = formatEpochTime(snapshot.triggerAtMillis, is24Hour, locale),
+                caption = "",
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlanceCard(title: String, value: String, caption: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .clip(EMBER_CUT)
+            .background(EMBER_SURFACE)
+            .border(1.dp, EMBER_COPPER.copy(alpha = 0.5f), EMBER_CUT)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(text = title.uppercase(), color = EMBER_COPPER, fontFamily = FontFamily.Monospace, fontSize = 11.sp, letterSpacing = 0.5.sp)
+        Text(text = value, color = EMBER_INK, fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
+        if (caption.isNotEmpty()) {
+            Text(text = caption, color = EMBER_SECONDARY, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+        }
+    }
+}
+
+/** The mockup's wide media block, replaced with real local history (contract: never fake media).
+ * Absent entirely until the launcher has actually opened something. */
+@Composable
+private fun QuickAccessBlock(recentApps: List<AppEntry>, actions: RiceActions) {
+    if (recentApps.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(EMBER_CUT)
+            .background(EMBER_SURFACE)
+            .border(1.dp, EMBER_COPPER.copy(alpha = 0.5f), EMBER_CUT)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(text = stringResource(R.string.ember_quick_access), color = EMBER_COPPER, fontFamily = FontFamily.Monospace, fontSize = 11.sp, letterSpacing = 0.5.sp)
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            for (entry in recentApps.take(4)) {
+                Column(
+                    modifier = Modifier.combinedClickable(
+                        onClick = { actions.openApp(entry.key) },
+                        onLongClick = { actions.showAppMenu(entry.key) },
+                    ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AppIcon(entry = entry, size = 34.dp, plateShape = EMBER_CUT, plateColor = EMBER_CARBON)
+                    Text(
+                        text = entry.label,
+                        color = EMBER_INK,
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp).width(56.dp),
+                    )
+                }
             }
         }
     }
