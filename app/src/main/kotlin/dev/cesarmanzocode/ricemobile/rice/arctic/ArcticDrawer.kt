@@ -149,7 +149,10 @@ private fun ArcticSearchField(
             .border(1.dp, ARCTIC_BORDER, RoundedCornerShape(50))
             .padding(horizontal = 18.dp),
         decorationBox = { inner ->
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+            // No fillMaxSize here: inside a Column this box is measured before the weighted
+            // catalog Box, so a height-filling modifier would claim the *whole* remaining
+            // Column height (not just this field's share) and starve the grid below it.
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 if (query.isEmpty()) {
                     Text(text = stringResource(R.string.search_hint), color = ARCTIC_SECONDARY, fontSize = 15.sp)
                 }

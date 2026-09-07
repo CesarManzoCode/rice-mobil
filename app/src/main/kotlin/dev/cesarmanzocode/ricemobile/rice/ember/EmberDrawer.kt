@@ -157,7 +157,10 @@ private fun EmberSearchField(
             .border(1.dp, EMBER_COPPER.copy(alpha = 0.6f), RectangleShape)
             .padding(horizontal = 16.dp),
         decorationBox = { inner ->
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+            // No fillMaxSize: measured before the weighted catalog Box in this Column, a
+            // height-filling box here would claim the whole remaining Column height instead of
+            // just this field's own row (contract bug: catalog left with no space).
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 if (query.isEmpty()) {
                     Text(text = stringResource(R.string.search_hint), color = EMBER_SECONDARY, fontFamily = FontFamily.Monospace, fontSize = 15.sp)
                 }

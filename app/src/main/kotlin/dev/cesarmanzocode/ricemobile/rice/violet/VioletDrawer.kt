@@ -163,7 +163,10 @@ private fun VioletSearchField(
             .background(Color(0x40FFFFFF))
             .padding(horizontal = 18.dp),
         decorationBox = { inner ->
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+            // No fillMaxSize: this field is measured before the weighted catalog Box in the
+            // sheet's Column, so a height-filling box here would claim the whole remaining sheet
+            // height instead of its own row, leaving the grid with no space.
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 if (query.isEmpty()) {
                     Text(text = stringResource(R.string.search_hint), color = VIOLET_SECONDARY, fontSize = 15.sp)
                 }
