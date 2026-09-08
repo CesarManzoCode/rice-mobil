@@ -1,17 +1,25 @@
 package dev.cesarmanzocode.ricemobile.rice
 
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.apps.AppKey
 import dev.cesarmanzocode.ricemobile.apps.CatalogStatus
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperSpec
 
 /** A favorite slot: [app] is null when the identity is temporarily unavailable (contract §5.2). */
@@ -63,7 +71,10 @@ data class RiceActions(
     val goHome: () -> Unit,
     val updateQuery: (String) -> Unit,
     val openApp: (AppKey) -> Unit,
-    val showAppMenu: (AppKey) -> Unit,
+    /** [anchor] is the pressed item's own window-relative bounds (UX overhaul §7-9), captured by
+     * [dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable] — the menu anchors to it instead
+     * of appearing with no spatial relationship to what was pressed. */
+    val showAppMenu: (AppKey, ScreenRect) -> Unit,
     val requestHomeRole: () -> Unit,
     val retryCatalog: () -> Unit,
     /** Live Home->Drawer drag reporting (interaction sprint §3), additive to [openDrawer]: a rice
@@ -99,6 +110,11 @@ data class RiceMotion(
     val displacement: MotionDisplacement,
     val pressScale: Float,
     val pressMs: Int,
+    /** UX overhaul §19-20: the *mechanic* every press uses ([dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale])
+     * is shared, this is what makes the *result* not read as "five skins of the same animation" —
+     * null falls back to the plain `tween(pressMs)` every rice used before this pass. */
+    val pressSpec: AnimationSpec<Float>? = null,
+    val menuStyle: ContextMenuStyle,
 ) {
     /** Contract §10 table, one instance per rice; kept in this shared file since the *values*
      * are normative, even though each rice applies them to its own geometry. */
@@ -111,6 +127,15 @@ data class RiceMotion(
             displacement = MotionDisplacement.Fixed(12.dp),
             pressScale = 0.98f,
             pressMs = 70,
+            // "Quirúrgico": critically damped, near-zero overshoot — a snap, not a bounce.
+            pressSpec = spring(dampingRatio = 1f, stiffness = 1400f),
+            menuStyle = ContextMenuStyle(
+                background = Color(0xFF0A0A0A),
+                ink = Color(0xFFF5F5F0),
+                border = Color(0xFFF5F5F0),
+                shape = RectangleShape,
+                borderWidth = 1.dp,
+            ),
         )
         val Arctic = RiceMotion(
             enterMs = 280,
@@ -120,6 +145,15 @@ data class RiceMotion(
             displacement = MotionDisplacement.Fixed(28.dp),
             pressScale = 0.96f,
             pressMs = 100,
+            // "Líquido pero rápido": a hair of overshoot, glass settling into place.
+            pressSpec = spring(dampingRatio = 0.78f, stiffness = 520f),
+            menuStyle = ContextMenuStyle(
+                background = Color(0xE60F2436),
+                ink = Color(0xFFF5FBFF),
+                border = Color(0x82FFFFFF),
+                shape = RoundedCornerShape(20.dp),
+                borderWidth = 1.dp,
+            ),
         )
         val Ember = RiceMotion(
             enterMs = 170,
@@ -129,6 +163,15 @@ data class RiceMotion(
             displacement = MotionDisplacement.Fixed(18.dp),
             pressScale = 0.98f,
             pressMs = 70,
+            // "Piezas encajando": an underdamped spring — a real mechanical overshoot on release.
+            pressSpec = spring(dampingRatio = 0.42f, stiffness = 700f),
+            menuStyle = ContextMenuStyle(
+                background = Color(0xFF24201B),
+                ink = Color(0xFFF1E8DC),
+                border = Color(0xFFD99A67),
+                shape = CutCornerShape(6.dp),
+                borderWidth = 1.dp,
+            ),
         )
         val Ivory = RiceMotion(
             enterMs = 200,
@@ -138,6 +181,15 @@ data class RiceMotion(
             displacement = MotionDisplacement.Fixed(8.dp),
             pressScale = 1f, // Ivory's press is a tint/background change, not a scale (§10).
             pressMs = 90,
+            // Editorial: almost no bounce, a soft settle — "poco bounce" per the brief.
+            pressSpec = spring(dampingRatio = 1f, stiffness = 380f),
+            menuStyle = ContextMenuStyle(
+                background = Color(0xFFF3EBDD),
+                ink = Color(0xFF25231E),
+                border = Color(0xFFAAA08D),
+                shape = RoundedCornerShape(2.dp),
+                borderWidth = 1.dp,
+            ),
         )
         val Violet = RiceMotion(
             enterMs = 340,
@@ -147,9 +199,30 @@ data class RiceMotion(
             displacement = MotionDisplacement.HeightFraction(0.12f),
             pressScale = 0.96f,
             pressMs = 110,
+            // "Profundidad/halo": a slow, soft spring — cinematic, never snappy.
+            pressSpec = spring(dampingRatio = 0.62f, stiffness = 260f),
+            menuStyle = ContextMenuStyle(
+                background = Color(0xF2201638),
+                ink = Color(0xFFF3EDFF),
+                border = Color(0xFFBC9BFF),
+                shape = RoundedCornerShape(22.dp),
+                borderWidth = 1.dp,
+            ),
         )
     }
 }
+
+/** UX overhaul §7-9: the anchored context menu's chrome, one instance per rice so it reads as
+ * "part of the rice" instead of a shared Material widget with recolored text (contract §16: shared
+ * infra, never shared visual result). */
+@Immutable
+data class ContextMenuStyle(
+    val background: Color,
+    val ink: Color,
+    val border: Color,
+    val shape: Shape,
+    val borderWidth: Dp,
+)
 
 /**
  * Contract §6.1. Five real implementations; no `BaseRiceHome`. Each rice owns its full

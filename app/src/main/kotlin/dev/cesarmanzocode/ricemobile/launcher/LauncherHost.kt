@@ -48,8 +48,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -58,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -360,14 +365,13 @@ fun LauncherHost(
 
             LaunchedEffect(routeKey) { skipNextTransition = false }
 
-            state.appMenu?.let { key ->
-                AppActionsMenu(
-                    key = key,
-                    isFavorite = key in state.favoriteKeys,
-                    onDismiss = viewModel::dismissAppMenu,
-                    onToggleFavorite = viewModel::toggleFavorite,
-                )
-            }
+            AppActionsMenuHost(
+                request = state.appMenu,
+                riceId = state.rice,
+                favoriteKeys = state.favoriteKeys.toSet(),
+                onDismiss = viewModel::dismissAppMenu,
+                onToggleFavorite = viewModel::toggleFavorite,
+            )
 
             if (state.wallpaperStatus is WallpaperStatus.Failed) {
                 WallpaperRetryBanner(onRetry = viewModel::retryWallpaper, modifier = modifier)
@@ -445,7 +449,18 @@ private fun HomeDrawerPanel(
                     onDragEnd = onGrabberDragEnd,
                     onTap = onGrabberTap,
                 )
-                Box(modifier = Modifier.weight(1f)) {
+                // UX overhaul §23: full-area drag-to-close, not just the grabber. A rice's own
+                // LazyColumn/LazyVerticalGrid is the nested-scroll *child* here; this connection is
+                // its parent and only ever sees leftover (`available`) scroll the list itself could
+                // not consume — i.e. exactly the moment a downward drag hits the top of the list and
+                // has nowhere left to scroll. Below that point the list scrolls exactly as it always
+                // did, with zero per-rice plumbing (works for all five Drawers unmodified).
+                val closeConnection = rememberDrawerCloseNestedScrollConnection(
+                    onDragStart = onGrabberDragStart,
+                    onDrag = onGrabberDrag,
+                    onDragEnd = onGrabberDragEnd,
+                )
+                Box(modifier = Modifier.weight(1f).nestedScroll(closeConnection)) {
                     rice.Drawer(model = drawerModel, actions = actions)
                 }
             }
@@ -494,6 +509,51 @@ private fun DrawerGrabber(
                 .clip(RoundedCornerShape(2.dp))
                 .background(Color.White.copy(alpha = 0.32f)),
         )
+    }
+}
+
+/**
+ * UX overhaul §23: lets any rice's own scrollable Drawer content double as a drag-to-close
+ * surface without touching that rice's code. As the nested-scroll *parent* of whatever
+ * LazyColumn/LazyVerticalGrid a rice puts inside the Drawer, this only ever receives `available`
+ * (leftover, unconsumed) scroll — which is exactly zero as long as the list itself can still
+ * scroll, and only becomes non-zero the instant a downward drag hits the top of the list with
+ * nowhere left to go. From that point it drives the exact same [onDrag]/[onDragEnd] callbacks the
+ * grabber handle already uses, so both paths animate identically. `rememberUpdatedState` for each
+ * callback (matching this file's own `reducedMotionState`/`densityState` pattern) keeps the single
+ * `remember`ed connection instance safe to call from a gesture that outlives any one recomposition.
+ */
+@Composable
+private fun rememberDrawerCloseNestedScrollConnection(
+    onDragStart: () -> Unit,
+    onDrag: (deltaDownPx: Float) -> Unit,
+    onDragEnd: (velocityDownPxPerSec: Float) -> Unit,
+): NestedScrollConnection {
+    val startState = rememberUpdatedState(onDragStart)
+    val dragState = rememberUpdatedState(onDrag)
+    val endState = rememberUpdatedState(onDragEnd)
+    return remember {
+        object : NestedScrollConnection {
+            private var closing = false
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.Drag || available.y <= 0.5f) return Offset.Zero
+                if (!closing) {
+                    closing = true
+                    startState.value.invoke()
+                }
+                dragState.value.invoke(available.y)
+                return Offset(0f, available.y)
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!closing) return Velocity.Zero
+                closing = false
+                val downwardVelocity = available.y.coerceAtLeast(0f)
+                endState.value.invoke(downwardVelocity)
+                return if (available.y > 0f) available else Velocity.Zero
+            }
+        }
     }
 }
 

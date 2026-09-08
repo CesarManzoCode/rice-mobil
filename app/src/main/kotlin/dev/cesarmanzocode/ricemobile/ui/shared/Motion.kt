@@ -1,6 +1,7 @@
 package dev.cesarmanzocode.ricemobile.ui.shared
 
 import android.animation.ValueAnimator
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.TweenSpec
@@ -23,6 +24,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -108,12 +113,17 @@ fun rememberPressScale(
     interactionSource: MutableInteractionSource,
     scale: Float,
     durationMs: Int,
+    // Per-rice motion language (UX overhaul §19): a rice that wants its press to snap, overshoot
+    // or settle softly passes its own AnimationSpec instead of the shared plain tween — the
+    // *mechanic* (pressed-state -> target float) stays shared, the *feel* does not. Null keeps
+    // every existing call site's exact prior behavior (tween(durationMs)).
+    spec: AnimationSpec<Float>? = null,
 ): State<Float> {
     val pressed by interactionSource.collectIsPressedAsState()
     val reducedMotion = LocalReducedMotion.current
     return animateFloatAsState(
         targetValue = if (pressed) scale else 1f,
-        animationSpec = if (reducedMotion) snap() else tween(durationMs),
+        animationSpec = if (reducedMotion) snap() else (spec ?: tween(durationMs)),
         label = "press-scale",
     )
 }
@@ -133,9 +143,10 @@ fun Modifier.ricePressable(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
+    pressSpec: AnimationSpec<Float>? = null,
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
-    val scale by rememberPressScale(interactionSource, pressScale, pressMs)
+    val scale by rememberPressScale(interactionSource, pressScale, pressMs, pressSpec)
     this
         .graphicsLayer { scaleX = scale; scaleY = scale }
         .combinedClickable(
@@ -144,5 +155,44 @@ fun Modifier.ricePressable(
             onClick = onClick,
             onLongClick = onLongClick,
             onLongClickLabel = onLongClickLabel,
+        )
+}
+
+/**
+ * Everywhere a long-press opens the app context menu (UX overhaul §7-9): identical to
+ * [ricePressable] but also tracks this composable's own window-relative bounds via
+ * [onGloballyPositioned], so the menu can anchor itself to the exact item the user pressed
+ * instead of appearing "de golpe" with no spatial relationship to it. [onLongClickAt] receives
+ * the freshest captured bounds at the moment of the long click, not a stale first-layout value —
+ * `bounds` is plain Compose `State`, re-read every recomposition, and `onGloballyPositioned` keeps
+ * it current across scrolls/resizes.
+ */
+fun Modifier.appCellPressable(
+    pressScale: Float,
+    pressMs: Int,
+    onClick: () -> Unit,
+    onLongClickAt: (ScreenRect) -> Unit,
+    onLongClickLabel: String? = null,
+    pressSpec: AnimationSpec<Float>? = null,
+): Modifier = composed {
+    var bounds by remember { mutableStateOf(ScreenRect.Zero) }
+    val haptics = LocalHapticFeedback.current
+    this
+        .onGloballyPositioned { coordinates ->
+            val window = coordinates.boundsInWindow()
+            bounds = ScreenRect(window.left, window.top, window.right, window.bottom)
+        }
+        .ricePressable(
+            pressScale = pressScale,
+            pressMs = pressMs,
+            onClick = onClick,
+            onLongClick = {
+                // Centralized here (UX overhaul §21) so every one of the ~15 app-cell long-press
+                // sites gets the same haptic for free instead of repeating it per rice.
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onLongClickAt(bounds)
+            },
+            onLongClickLabel = onLongClickLabel,
+            pressSpec = pressSpec,
         )
 }

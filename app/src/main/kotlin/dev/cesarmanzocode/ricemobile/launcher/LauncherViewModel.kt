@@ -16,6 +16,7 @@ import dev.cesarmanzocode.ricemobile.preferences.PreferencesSnapshot
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.RiceId
 import dev.cesarmanzocode.ricemobile.rice.RiceRegistry
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperController
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperControllerStatus
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperMarkerPolicy
@@ -208,8 +209,8 @@ class LauncherViewModel(
 
     // --- Favorites / app menu (contract §5.2, §7, §11) ---
 
-    fun showAppMenu(key: AppKey) {
-        transient.update { LauncherNavigation.showAppMenu(it, key) }
+    fun showAppMenu(key: AppKey, anchor: ScreenRect) {
+        transient.update { LauncherNavigation.showAppMenu(it, key, anchor) }
     }
 
     fun dismissAppMenu() {
