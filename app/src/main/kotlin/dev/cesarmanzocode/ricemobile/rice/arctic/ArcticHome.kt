@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -60,6 +62,7 @@ import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
 import dev.cesarmanzocode.ricemobile.ui.shared.LocalDrawerDragProgress
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
 import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
@@ -380,9 +383,9 @@ private fun QuickAccessModule(apps: List<AppEntry>, onOpenAll: () -> Unit, actio
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                for (entry in apps) {
-                    AppQuickTile(entry = entry, actions = actions)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                items(apps, key = { "${it.key.userSerial}:${it.key.component}" }) { entry ->
+                    AppQuickTile(entry = entry, actions = actions, modifier = Modifier.animateItem())
                 }
             }
         }
@@ -390,13 +393,14 @@ private fun QuickAccessModule(apps: List<AppEntry>, onOpenAll: () -> Unit, actio
 }
 
 @Composable
-private fun AppQuickTile(entry: AppEntry, actions: RiceActions) {
+private fun AppQuickTile(entry: AppEntry, actions: RiceActions, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier.ricePressable(
+        modifier = modifier.appCellPressable(
             pressScale = RiceMotion.Arctic.pressScale,
             pressMs = RiceMotion.Arctic.pressMs,
+            pressSpec = RiceMotion.Arctic.pressSpec,
             onClick = { actions.openApp(entry.key) },
-            onLongClick = { actions.showAppMenu(entry.key) },
+            onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -450,12 +454,12 @@ private fun ArcticDock(favorites: List<FavoriteSlot>, actions: RiceActions, modi
         tint = ARCTIC_DOCK_TINT,
         baseAlpha = 0.34f,
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-            horizontalArrangement = if (favorites.isEmpty()) Arrangement.Center else Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (favorites.isEmpty()) {
+        if (favorites.isEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     text = stringResource(R.string.favorites_empty_hint),
                     color = ARCTIC_SECONDARY,
@@ -463,9 +467,22 @@ private fun ArcticDock(favorites: List<FavoriteSlot>, actions: RiceActions, modi
                     maxLines = 2,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
-            } else {
-                for (slot in favorites) {
-                    DockSlot(slot = slot, actions = actions, modifier = Modifier.weight(1f))
+            }
+        } else {
+            // UX overhaul §9: LazyRow + animateItem() instead of a plain Row — adding/removing a
+            // favorite reflows and fades the small affected set instead of teleporting (Compose
+            // handles the insert/remove fade and the reflow-placement animation together, no
+            // hand-rolled Animatable needed for a list this size).
+            LazyRow(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(favorites, key = { "${it.key.userSerial}:${it.key.component}" }) { slot ->
+                    DockSlot(
+                        slot = slot,
+                        actions = actions,
+                        modifier = Modifier.fillParentMaxWidth(1f / favorites.size).animateItem(),
+                    )
                 }
             }
         }
@@ -479,11 +496,12 @@ private fun DockSlot(slot: FavoriteSlot, actions: RiceActions, modifier: Modifie
     Column(
         modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .ricePressable(
+            .appCellPressable(
                 pressScale = RiceMotion.Arctic.pressScale,
                 pressMs = RiceMotion.Arctic.pressMs,
+                pressSpec = RiceMotion.Arctic.pressSpec,
                 onClick = { app?.let { actions.openApp(it.key) } },
-                onLongClick = { actions.showAppMenu(slot.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(slot.key, rect) },
                 onLongClickLabel = removeLabel,
             ),
         horizontalAlignment = Alignment.CenterHorizontally,

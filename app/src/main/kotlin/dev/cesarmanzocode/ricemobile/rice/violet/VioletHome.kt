@@ -1,10 +1,9 @@
 package dev.cesarmanzocode.ricemobile.rice.violet
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,12 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -46,12 +43,12 @@ import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
 import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
 import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberCurrentLocale
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberIs24HourFormat
-import dev.cesarmanzocode.ricemobile.ui.shared.rememberPressScale
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperBackdrop
 import java.time.format.FormatStyle
 
@@ -71,8 +68,12 @@ internal val VIOLET_ACCENT = Color(0xFFBC9BFF)
 @Composable
 fun VioletHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
     HomeGestureSurface(
-        onSwipeUp = actions.openDrawer,
+        // UX overhaul §1: see MonochromeHome's identical wiring for why onSwipeUp is now a no-op.
+        onSwipeUp = {},
         onLongPress = actions.openPicker,
+        onDragStart = actions.beginDrawerDrag,
+        onDrag = actions.dragDrawer,
+        onDragEnd = actions.endDrawerDrag,
         modifier = modifier.fillMaxSize(),
     ) {
         WallpaperBackdrop(spec = VioletNightRice.wallpaper, modifier = Modifier.fillMaxSize())
@@ -203,7 +204,12 @@ private fun Cluster(favorites: List<FavoriteSlot>, actions: RiceActions) {
     }
     val rowSizes = listOf(1, 2, 2)
     var index = 0
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    // UX overhaul §9: the 1-2-2 stagger is a deliberately hand-placed layout (contract §18.6),
+    // not a natural fit for LazyVerticalGrid's spans the way Ember's uniform matrix is — converting
+    // it would cost the exact centered stagger the approved mockup specifies. animateContentSize()
+    // is the honest, smaller trade for this one rice: the container smoothly resizes when a row
+    // appears/disappears instead of snapping, without reshaping the cluster's geometry.
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.animateContentSize()) {
         for (rowSize in rowSizes) {
             if (index >= favorites.size) break
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -226,8 +232,6 @@ private fun Cluster(favorites: List<FavoriteSlot>, actions: RiceActions) {
 
 @Composable
 private fun Node(slot: FavoriteSlot, principal: Boolean, actions: RiceActions) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressScale by rememberPressScale(interactionSource, RiceMotion.Violet.pressScale, RiceMotion.Violet.pressMs)
     val app = slot.app
     val removeLabel = stringResource(R.string.action_remove_favorite)
     val nodeSize = if (principal) 56.dp else 44.dp
@@ -237,12 +241,12 @@ private fun Node(slot: FavoriteSlot, principal: Boolean, actions: RiceActions) {
         Box(
             modifier = Modifier
                 .defaultMinSize(minWidth = targetSize, minHeight = targetSize)
-                .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
-                .combinedClickable(
-                    interactionSource = interactionSource,
-                    indication = null,
+                .appCellPressable(
+                    pressScale = RiceMotion.Violet.pressScale,
+                    pressMs = RiceMotion.Violet.pressMs,
+                    pressSpec = RiceMotion.Violet.pressSpec,
                     onClick = { app?.let { actions.openApp(it.key) } },
-                    onLongClick = { actions.showAppMenu(slot.key) },
+                    onLongClickAt = { rect -> actions.showAppMenu(slot.key, rect) },
                     onLongClickLabel = removeLabel,
                 ),
             contentAlignment = Alignment.Center,

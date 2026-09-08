@@ -2,7 +2,6 @@ package dev.cesarmanzocode.ricemobile.rice.monochrome
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +15,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +45,7 @@ import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
 import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockAmPm
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
@@ -70,8 +71,15 @@ internal val MONOCHROME_BORDER = Color(0xFF454545)
 @Composable
 fun MonochromeHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
     HomeGestureSurface(
-        onSwipeUp = actions.openDrawer,
+        // UX overhaul §1: the old fire-once threshold is fully superseded by the live drag below
+        // (matches Arctic's own wiring, interaction sprint §2-3) — `onSwipeUp = {}` keeps
+        // HomeGestureSurface's own accumulator harmless-but-unused instead of double-driving the
+        // transition once both fire on release.
+        onSwipeUp = {},
         onLongPress = actions.openPicker,
+        onDragStart = actions.beginDrawerDrag,
+        onDrag = actions.dragDrawer,
+        onDragEnd = actions.endDrawerDrag,
         modifier = modifier.fillMaxSize(),
     ) {
         WallpaperBackdrop(spec = MonochromeRice.wallpaper, modifier = Modifier.fillMaxSize())
@@ -191,11 +199,17 @@ private fun FavoritesBlock(favorites: List<FavoriteSlot>, actions: RiceActions) 
                 modifier = Modifier.padding(vertical = 20.dp),
             )
         } else {
-            Column {
-                for ((index, slot) in favorites.withIndex()) {
-                    FavoriteRow(index = index + 1, slot = slot, actions = actions)
-                    if (index != favorites.lastIndex) {
-                        HorizontalDivider(color = MONOCHROME_BORDER.copy(alpha = 0.4f))
+            // UX overhaul §9: LazyColumn + animateItem() — no explicit height/weight modifier, so
+            // this still sizes to its own content like the plain Column it replaces (LazyColumn
+            // only fills a *bounded* incoming constraint when its content is actually that tall);
+            // TriggerBar below keeps its usual position.
+            LazyColumn {
+                itemsIndexed(favorites, key = { _, slot -> "${slot.key.userSerial}:${slot.key.component}" }) { index, slot ->
+                    Column(modifier = Modifier.animateItem()) {
+                        FavoriteRow(index = index + 1, slot = slot, actions = actions)
+                        if (index != favorites.lastIndex) {
+                            HorizontalDivider(color = MONOCHROME_BORDER.copy(alpha = 0.4f))
+                        }
                     }
                 }
             }
@@ -207,8 +221,6 @@ private fun FavoritesBlock(favorites: List<FavoriteSlot>, actions: RiceActions) 
 
 @Composable
 private fun FavoriteRow(index: Int, slot: FavoriteSlot, actions: RiceActions) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressScale by rememberPressScale(interactionSource, RiceMotion.Monochrome.pressScale, RiceMotion.Monochrome.pressMs)
     val app = slot.app
     val removeLabel = stringResource(R.string.action_remove_favorite)
 
@@ -216,12 +228,12 @@ private fun FavoriteRow(index: Int, slot: FavoriteSlot, actions: RiceActions) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
+            .appCellPressable(
+                pressScale = RiceMotion.Monochrome.pressScale,
+                pressMs = RiceMotion.Monochrome.pressMs,
+                pressSpec = RiceMotion.Monochrome.pressSpec,
                 onClick = { app?.let { actions.openApp(it.key) } },
-                onLongClick = { actions.showAppMenu(slot.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(slot.key, rect) },
                 onLongClickLabel = removeLabel,
             )
             .padding(vertical = 8.dp),

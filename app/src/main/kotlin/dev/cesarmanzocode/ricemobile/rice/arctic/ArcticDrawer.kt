@@ -93,7 +93,9 @@ import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
 import dev.cesarmanzocode.ricemobile.ui.shared.LocalReducedMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.MotionTokens
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.ricePressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
 import kotlinx.coroutines.launch
@@ -346,11 +348,12 @@ private fun AppRowSection(title: String, apps: List<AppEntry>, actions: RiceActi
 @Composable
 private fun AppRowTile(entry: AppEntry, actions: RiceActions) {
     Column(
-        modifier = Modifier.ricePressable(
+        modifier = Modifier.appCellPressable(
             pressScale = RiceMotion.Arctic.pressScale,
             pressMs = RiceMotion.Arctic.pressMs,
+            pressSpec = RiceMotion.Arctic.pressSpec,
             onClick = { actions.openApp(entry.key) },
-            onLongClick = { actions.showAppMenu(entry.key) },
+            onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -468,7 +471,7 @@ private fun AppGrid(entries: List<AppEntry>, favoriteKeys: Set<AppKey>, actions:
                     entry = entry,
                     isFavorite = entry.key in favoriteKeys,
                     onClick = { actions.openApp(entry.key) },
-                    onLongClick = { actions.showAppMenu(entry.key) },
+                    onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
                 )
             }
         }
@@ -476,16 +479,17 @@ private fun AppGrid(entries: List<AppEntry>, favoriteKeys: Set<AppKey>, actions:
 }
 
 @Composable
-private fun GridCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun GridCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClickAt: (ScreenRect) -> Unit) {
     val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
     Column(
         modifier = Modifier
             .heightIn(min = 84.dp)
-            .ricePressable(
+            .appCellPressable(
                 pressScale = RiceMotion.Arctic.pressScale,
                 pressMs = RiceMotion.Arctic.pressMs,
+                pressSpec = RiceMotion.Arctic.pressSpec,
                 onClick = onClick,
-                onLongClick = onLongClick,
+                onLongClickAt = onLongClickAt,
                 onLongClickLabel = toggleLabel,
             )
             .padding(8.dp),
@@ -578,11 +582,12 @@ private fun AllAppsRow(entry: AppEntry, isFavorite: Boolean, actions: RiceAction
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .ricePressable(
+            .appCellPressable(
                 pressScale = RiceMotion.Arctic.pressScale,
                 pressMs = RiceMotion.Arctic.pressMs,
+                pressSpec = RiceMotion.Arctic.pressSpec,
                 onClick = { actions.openApp(entry.key) },
-                onLongClick = { actions.showAppMenu(entry.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
                 onLongClickLabel = toggleLabel,
             )
             .padding(vertical = 6.dp),

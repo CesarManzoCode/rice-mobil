@@ -1,7 +1,6 @@
 package dev.cesarmanzocode.ricemobile.rice.ivory
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -37,10 +38,12 @@ import dev.cesarmanzocode.ricemobile.launcher.ClockProvider
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.HomeModel
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
 import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
 import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
@@ -65,8 +68,12 @@ private val IVORY_PLATE = Color(0xFFE9DFCC)
 @Composable
 fun IvoryHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
     HomeGestureSurface(
-        onSwipeUp = actions.openDrawer,
+        // UX overhaul §1: see MonochromeHome's identical wiring for why onSwipeUp is now a no-op.
+        onSwipeUp = {},
         onLongPress = actions.openPicker,
+        onDragStart = actions.beginDrawerDrag,
+        onDrag = actions.dragDrawer,
+        onDragEnd = actions.endDrawerDrag,
         modifier = modifier.fillMaxSize(),
     ) {
         WallpaperBackdrop(spec = IvoryPaperRice.wallpaper, modifier = Modifier.fillMaxSize())
@@ -194,23 +201,26 @@ private fun FavoritesRow(favorites: List<FavoriteSlot>, actions: RiceActions) {
         Text(text = stringResource(R.string.favorites_empty_hint), color = IVORY_SECONDARY, fontFamily = FontFamily.Serif, fontSize = 17.sp)
         return
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        for (slot in favorites) {
-            FavoriteTile(slot = slot, actions = actions)
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        items(favorites, key = { "${it.key.userSerial}:${it.key.component}" }) { slot ->
+            FavoriteTile(slot = slot, actions = actions, modifier = Modifier.animateItem())
         }
     }
 }
 
 @Composable
-private fun FavoriteTile(slot: FavoriteSlot, actions: RiceActions) {
+private fun FavoriteTile(slot: FavoriteSlot, actions: RiceActions, modifier: Modifier = Modifier) {
     val app = slot.app
     val removeLabel = stringResource(R.string.action_remove_favorite)
     Column(
-        modifier = Modifier
+        modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .combinedClickable(
+            .appCellPressable(
+                pressScale = RiceMotion.Ivory.pressScale,
+                pressMs = RiceMotion.Ivory.pressMs,
+                pressSpec = RiceMotion.Ivory.pressSpec,
                 onClick = { app?.let { actions.openApp(it.key) } },
-                onLongClick = { actions.showAppMenu(slot.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(slot.key, rect) },
                 onLongClickLabel = removeLabel,
             ),
         horizontalAlignment = Alignment.CenterHorizontally,

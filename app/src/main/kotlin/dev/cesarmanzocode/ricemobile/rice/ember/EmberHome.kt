@@ -20,15 +20,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,10 +52,13 @@ import dev.cesarmanzocode.ricemobile.launcher.ClockProvider
 import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.HomeModel
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.system.rememberBatterySnapshot
 import dev.cesarmanzocode.ricemobile.system.rememberNextAlarmSnapshot
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.HomeGestureSurface
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockDate
 import dev.cesarmanzocode.ricemobile.ui.shared.formatClockTime
 import dev.cesarmanzocode.ricemobile.ui.shared.formatEpochTime
@@ -71,8 +84,12 @@ internal val EMBER_CUT = CutCornerShape(6.dp)
 @Composable
 fun EmberHome(model: HomeModel, actions: RiceActions, modifier: Modifier = Modifier) {
     HomeGestureSurface(
-        onSwipeUp = actions.openDrawer,
+        // UX overhaul §1: see MonochromeHome's identical wiring for why onSwipeUp is now a no-op.
+        onSwipeUp = {},
         onLongPress = actions.openPicker,
+        onDragStart = actions.beginDrawerDrag,
+        onDrag = actions.dragDrawer,
+        onDragEnd = actions.endDrawerDrag,
         modifier = modifier.fillMaxSize(),
     ) {
         WallpaperBackdrop(spec = EmberForgeRice.wallpaper, modifier = Modifier.fillMaxSize())
@@ -202,9 +219,12 @@ private fun QuickAccessBlock(recentApps: List<AppEntry>, actions: RiceActions) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             for (entry in recentApps.take(4)) {
                 Column(
-                    modifier = Modifier.combinedClickable(
+                    modifier = Modifier.appCellPressable(
+                        pressScale = RiceMotion.Ember.pressScale,
+                        pressMs = RiceMotion.Ember.pressMs,
+                        pressSpec = RiceMotion.Ember.pressSpec,
                         onClick = { actions.openApp(entry.key) },
-                        onLongClick = { actions.showAppMenu(entry.key) },
+                        onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
                     ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -230,17 +250,25 @@ private fun FavoritesMatrix(favorites: List<FavoriteSlot>, actions: RiceActions)
         Text(text = stringResource(R.string.favorites_empty_hint), color = EMBER_SECONDARY, fontFamily = FontFamily.Monospace, fontSize = 14.sp)
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val first = favorites.first()
-        FavoriteBlock(slot = first, actions = actions, modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp))
-        val rest = favorites.drop(1)
-        for (row in rest.chunked(2)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (slot in row) {
-                    FavoriteBlock(slot = slot, actions = actions, modifier = Modifier.weight(1f).heightIn(min = 64.dp))
-                }
-                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
-            }
+    // UX overhaul §9: a LazyVerticalGrid (no explicit height, so it still sizes to its own content
+    // like the Column+chunked(2) it replaces) reproduces the exact same 1-full-width+2-column
+    // layout for free via a span on the first item — and gets add/remove/reflow animation via
+    // animateItem() that the hand-chunked version couldn't have without a lot more bookkeeping.
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        itemsIndexed(
+            favorites,
+            key = { _, slot -> "${slot.key.userSerial}:${slot.key.component}" },
+            span = { index, _ -> GridItemSpan(if (index == 0) 2 else 1) },
+        ) { index, slot ->
+            FavoriteBlock(
+                slot = slot,
+                actions = actions,
+                modifier = Modifier.fillMaxWidth().heightIn(min = if (index == 0) 72.dp else 64.dp).animateItem(),
+            )
         }
     }
 }
@@ -254,9 +282,18 @@ private fun FavoriteBlock(slot: FavoriteSlot, actions: RiceActions, modifier: Mo
     val border = if (pressed) EMBER_SURFACE else EMBER_COPPER.copy(alpha = 0.5f)
     val labelColor = if (pressed) EMBER_SURFACE else EMBER_INK
     val removeLabel = stringResource(R.string.action_remove_favorite)
+    // Ember's own press mechanic (an inverted fill, not a scale — §5/§19: "presión física", never
+    // the shared scale-tween every other cell uses) still needs the item's own bounds to anchor
+    // the context menu, so this captures them the same way appCellPressable does internally.
+    var bounds by remember { mutableStateOf(ScreenRect.Zero) }
+    val haptics = LocalHapticFeedback.current
 
     Row(
         modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                val window = coordinates.boundsInWindow()
+                bounds = ScreenRect(window.left, window.top, window.right, window.bottom)
+            }
             .clip(EMBER_CUT)
             .background(background)
             .border(1.dp, border, EMBER_CUT)
@@ -264,7 +301,10 @@ private fun FavoriteBlock(slot: FavoriteSlot, actions: RiceActions, modifier: Mo
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = { app?.let { actions.openApp(it.key) } },
-                onLongClick = { actions.showAppMenu(slot.key) },
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    actions.showAppMenu(slot.key, bounds)
+                },
                 onLongClickLabel = removeLabel,
             )
             .padding(horizontal = 12.dp),

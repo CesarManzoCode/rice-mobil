@@ -5,8 +5,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,9 +55,11 @@ import dev.cesarmanzocode.ricemobile.rice.DrawerHierarchy
 import dev.cesarmanzocode.ricemobile.rice.DrawerModel
 import dev.cesarmanzocode.ricemobile.rice.DrawerView
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
 import kotlinx.coroutines.launch
 
@@ -179,7 +179,7 @@ private fun BrowseView(
                 SectionHeader(stringResource(R.string.drawer_section_recent))
             }
             items(model.recentApps.take(5), key = { "recent:${it.key.userSerial}:${it.key.component}" }) { entry ->
-                AppRow(entry = entry, isFavorite = entry.key in model.favoriteKeys, compact = true, actions = actions)
+                AppRow(entry = entry, isFavorite = entry.key in model.favoriteKeys, compact = true, actions = actions, modifier = Modifier.animateItem())
             }
             item(key = "recent-rule") { HorizontalDivider(color = MONOCHROME_BORDER, modifier = Modifier.padding(vertical = 8.dp)) }
         }
@@ -333,18 +333,18 @@ private fun rememberLazyListStateFor(groups: List<Pair<String, List<AppEntry>>>)
 }
 
 @Composable
-private fun AppRow(entry: AppEntry, isFavorite: Boolean, compact: Boolean, actions: RiceActions) {
-    val interactionSource = remember { MutableInteractionSource() }
+private fun AppRow(entry: AppEntry, isFavorite: Boolean, compact: Boolean, actions: RiceActions, modifier: Modifier = Modifier) {
     val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = if (compact) 52.dp else 60.dp)
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
+            .appCellPressable(
+                pressScale = RiceMotion.Monochrome.pressScale,
+                pressMs = RiceMotion.Monochrome.pressMs,
+                pressSpec = RiceMotion.Monochrome.pressSpec,
                 onClick = { actions.openApp(entry.key) },
-                onLongClick = { actions.showAppMenu(entry.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
                 onLongClickLabel = toggleLabel,
             )
             .padding(horizontal = 24.dp, vertical = 8.dp),

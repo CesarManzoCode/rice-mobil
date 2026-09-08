@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,9 +53,12 @@ import dev.cesarmanzocode.ricemobile.rice.DrawerHierarchy
 import dev.cesarmanzocode.ricemobile.rice.DrawerModel
 import dev.cesarmanzocode.ricemobile.rice.DrawerView
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
 
 /**
@@ -216,9 +218,12 @@ private fun PanelLabel(text: String) {
 private fun QuickTile(entry: AppEntry, isFavorite: Boolean, actions: RiceActions) {
     val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
     Column(
-        modifier = Modifier.combinedClickable(
+        modifier = Modifier.appCellPressable(
+            pressScale = RiceMotion.Ember.pressScale,
+            pressMs = RiceMotion.Ember.pressMs,
+            pressSpec = RiceMotion.Ember.pressSpec,
             onClick = { actions.openApp(entry.key) },
-            onLongClick = { actions.showAppMenu(entry.key) },
+            onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
             onLongClickLabel = toggleLabel,
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -287,7 +292,7 @@ private fun CompactGrid(entries: List<AppEntry>, favoriteKeys: Set<AppKey>, acti
                     entry = entry,
                     isFavorite = entry.key in favoriteKeys,
                     onClick = { actions.openApp(entry.key) },
-                    onLongClick = { actions.showAppMenu(entry.key) },
+                    onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
                 )
             }
         }
@@ -295,13 +300,20 @@ private fun CompactGrid(entries: List<AppEntry>, favoriteKeys: Set<AppKey>, acti
 }
 
 @Composable
-private fun CompactCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun CompactCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClickAt: (ScreenRect) -> Unit) {
     val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = toggleLabel)
+            .appCellPressable(
+                pressScale = RiceMotion.Ember.pressScale,
+                pressMs = RiceMotion.Ember.pressMs,
+                pressSpec = RiceMotion.Ember.pressSpec,
+                onClick = onClick,
+                onLongClickAt = onLongClickAt,
+                onLongClickLabel = toggleLabel,
+            )
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

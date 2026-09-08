@@ -5,7 +5,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,9 +48,11 @@ import dev.cesarmanzocode.ricemobile.rice.DrawerHierarchy
 import dev.cesarmanzocode.ricemobile.rice.DrawerModel
 import dev.cesarmanzocode.ricemobile.rice.DrawerView
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
 
 /**
@@ -151,7 +152,7 @@ private fun BrowseView(
         if (model.recentApps.isNotEmpty()) {
             item(key = "recent-header") { SectionLabel(stringResource(R.string.drawer_section_recent)) }
             items(model.recentApps.take(4), key = { "recent:${it.key.userSerial}:${it.key.component}" }) { entry ->
-                IndexRow(entry = entry, isFavorite = entry.key in model.favoriteKeys, indent = false, actions = actions)
+                IndexRow(entry = entry, isFavorite = entry.key in model.favoriteKeys, indent = false, actions = actions, modifier = Modifier.animateItem())
             }
             item(key = "recent-rule") { HorizontalDivider(color = IVORY_RULE, modifier = Modifier.padding(vertical = 10.dp)) }
         }
@@ -241,16 +242,19 @@ private fun GroupHeader(letter: String) {
 }
 
 @Composable
-private fun IndexRow(entry: AppEntry, isFavorite: Boolean, indent: Boolean, actions: RiceActions) {
+private fun IndexRow(entry: AppEntry, isFavorite: Boolean, indent: Boolean, actions: RiceActions, modifier: Modifier = Modifier) {
     val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .padding(start = if (indent) 32.dp else 0.dp)
-            .combinedClickable(
+            .appCellPressable(
+                pressScale = RiceMotion.Ivory.pressScale,
+                pressMs = RiceMotion.Ivory.pressMs,
+                pressSpec = RiceMotion.Ivory.pressSpec,
                 onClick = { actions.openApp(entry.key) },
-                onLongClick = { actions.showAppMenu(entry.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
                 onLongClickLabel = toggleLabel,
             ),
         verticalAlignment = Alignment.CenterVertically,

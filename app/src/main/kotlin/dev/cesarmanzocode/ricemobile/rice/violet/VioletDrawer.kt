@@ -5,7 +5,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,9 +54,12 @@ import dev.cesarmanzocode.ricemobile.rice.DrawerHierarchy
 import dev.cesarmanzocode.ricemobile.rice.DrawerModel
 import dev.cesarmanzocode.ricemobile.rice.DrawerView
 import dev.cesarmanzocode.ricemobile.rice.RiceActions
+import dev.cesarmanzocode.ricemobile.rice.RiceMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.AppIcon
 import dev.cesarmanzocode.ricemobile.ui.shared.EmptyState
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 import dev.cesarmanzocode.ricemobile.ui.shared.SearchImeOptions
+import dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable
 import dev.cesarmanzocode.ricemobile.ui.shared.rememberSearchKeyboardActions
 import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperBackdrop
 
@@ -236,9 +238,12 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun RecentBubble(entry: AppEntry, actions: RiceActions) {
     Column(
-        modifier = Modifier.combinedClickable(
+        modifier = Modifier.appCellPressable(
+            pressScale = RiceMotion.Violet.pressScale,
+            pressMs = RiceMotion.Violet.pressMs,
+            pressSpec = RiceMotion.Violet.pressSpec,
             onClick = { actions.openApp(entry.key) },
-            onLongClick = { actions.showAppMenu(entry.key) },
+            onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
         ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -287,19 +292,26 @@ private fun SheetGrid(entries: List<AppEntry>, favoriteKeys: Set<AppKey>, action
                 entry = entry,
                 isFavorite = entry.key in favoriteKeys,
                 onClick = { actions.openApp(entry.key) },
-                onLongClick = { actions.showAppMenu(entry.key) },
+                onLongClickAt = { rect -> actions.showAppMenu(entry.key, rect) },
             )
         }
     }
 }
 
 @Composable
-private fun SheetCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun SheetCell(entry: AppEntry, isFavorite: Boolean, onClick: () -> Unit, onLongClickAt: (ScreenRect) -> Unit) {
     val toggleLabel = stringResource(if (isFavorite) R.string.action_remove_favorite else R.string.action_add_favorite)
     Column(
         modifier = Modifier
             .heightIn(min = 92.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = toggleLabel)
+            .appCellPressable(
+                pressScale = RiceMotion.Violet.pressScale,
+                pressMs = RiceMotion.Violet.pressMs,
+                pressSpec = RiceMotion.Violet.pressSpec,
+                onClick = onClick,
+                onLongClickAt = onLongClickAt,
+                onLongClickLabel = toggleLabel,
+            )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
