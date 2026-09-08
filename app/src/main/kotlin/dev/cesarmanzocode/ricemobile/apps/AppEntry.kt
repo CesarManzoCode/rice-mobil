@@ -20,5 +20,6 @@ data class AppEntry(
     val normalizedLabel: String,
     val normalizedPackage: String,
     val iconRevision: Long,
+    val category: AppCategory = AppCategory.Other,
     val available: Boolean = true,
 )

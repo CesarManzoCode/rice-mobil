@@ -24,11 +24,13 @@ val Context.launcherDataStore: DataStore<Preferences> by preferencesDataStore(
 
 private val RICE = stringPreferencesKey("rice_id")
 private val FAVORITES = stringPreferencesKey("favorites_v1")
+private val RECENTS = stringPreferencesKey("recent_apps_v1")
 private val WALLPAPER = stringPreferencesKey("wallpaper_applied")
 
 data class LauncherPreferences(
     val rice: RiceId = RiceId.Default,
     val favorites: List<AppKey> = emptyList(),
+    val recentApps: List<AppKey> = emptyList(),
     val appliedWallpaper: String? = null, // "id:assetRevision"
 )
 
@@ -84,6 +86,17 @@ class PreferencesRepository(private val store: DataStore<Preferences>) {
         }
     }
 
+    /** Records a successful local launch (Sprint 3 second pass §"RECENTES"): never Android
+     * UsageStats, purely this launcher's own history, most-recent-first, capped and deduped by
+     * [RecentAppsRules]. Fire-and-forget from the caller's point of view — it never blocks or
+     * delays opening the app. */
+    suspend fun recordAppOpened(key: AppKey) {
+        store.edit { prefs ->
+            val current = RecentAppsCodec.decode(prefs[RECENTS])
+            prefs[RECENTS] = RecentAppsCodec.encode(RecentAppsRules.recordOpen(current, key))
+        }
+    }
+
     /** Only commits the marker if [riceId] is still the persisted rice (contract §8). */
     suspend fun markWallpaperApplied(riceId: RiceId, marker: String) {
         store.edit { prefs ->
@@ -97,6 +110,7 @@ class PreferencesRepository(private val store: DataStore<Preferences>) {
     private fun Preferences.toLauncherPreferences(): LauncherPreferences = LauncherPreferences(
         rice = RiceId.fromPersisted(this[RICE]),
         favorites = FavoriteCodec.decode(this[FAVORITES]),
+        recentApps = RecentAppsCodec.decode(this[RECENTS]),
         appliedWallpaper = this[WALLPAPER],
     )
 }

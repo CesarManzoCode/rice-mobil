@@ -24,12 +24,23 @@ private val SWIPE_MIN_VELOCITY = 900.dp // per second
  * Home's free background: swipe up opens the drawer once (contract §7). Ignores horizontal
  * drags, never captures a gesture a child already consumed, and long press is a separate
  * detector that never launches on release.
+ *
+ * [onDragStart]/[onDrag]/[onDragEnd] are additive, opt-in reporting for a rice that wants to drive
+ * a live, finger-following transition (interaction sprint §2-3) instead of the fire-once
+ * [onSwipeUp]: they observe the exact same drag stream, so a rice can pass both (old threshold
+ * behavior untouched) or only the live callbacks (passing `onSwipeUp = {}`). [onDrag] reports the
+ * raw per-event delta in px, positive while the finger moves *up*; [onDragEnd] reports the
+ * release velocity in px/s, positive for an upward fling — the caller decides its own
+ * threshold/settle, this surface only forwards the gesture.
  */
 @Composable
 fun HomeGestureSurface(
-    onSwipeUp: () -> Unit,
+    onSwipeUp: () -> Unit = {},
     modifier: Modifier = Modifier,
     onLongPress: (() -> Unit)? = null,
+    onDragStart: () -> Unit = {},
+    onDrag: (Float) -> Unit = {},
+    onDragEnd: (velocityPxPerSec: Float) -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -38,16 +49,20 @@ fun HomeGestureSurface(
     val minDistancePx = with(density) { SWIPE_MIN_DISTANCE.toPx() }
     val minVelocityPxPerSec = with(density) { SWIPE_MIN_VELOCITY.toPx() }
 
-    val dragState = rememberDraggableState { delta -> accumulatedUp -= delta }
+    val dragState = rememberDraggableState { delta ->
+        accumulatedUp -= delta
+        onDrag(-delta)
+    }
 
     var gestureModifier: Modifier = Modifier.draggable(
         orientation = Orientation.Vertical,
         state = dragState,
-        onDragStarted = { accumulatedUp = 0f },
+        onDragStarted = { accumulatedUp = 0f; onDragStart() },
         onDragStopped = { velocity ->
             val movedEnough = accumulatedUp >= thresholdPx
             val fastEnough = accumulatedUp >= minDistancePx && -velocity >= minVelocityPxPerSec
             if (movedEnough || fastEnough) onSwipeUp()
+            onDragEnd(-velocity)
             accumulatedUp = 0f
         },
     )

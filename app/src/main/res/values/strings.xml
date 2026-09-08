@@ -21,4 +21,51 @@
     <string name="rice_name_violet_night">Violet Night</string>
     <string name="wallpaper_failed">No se pudo cambiar el fondo</string>
     <string name="preferences_unavailable">No se pudieron leer las preferencias</string>
+    <string name="favorite_marked_hint">Favorita</string>
+    <string name="drawer_title">APPS</string>
+    <string name="drawer_library_title">Biblioteca de apps</string>
+    <string name="ivory_edition_action">Edición</string>
+    <string name="arctic_explore_hint">Apps</string>
+    <string name="violet_explore_hint">Explorar</string>
+    <string name="close_drawer">Cerrar</string>
+    <string name="ember_all_apps">TODAS LAS APPS</string>
+    <plurals name="catalog_result_count">
+        <item quantity="one">%d resultado</item>
+        <item quantity="other">%d resultados</item>
+    </plurals>
+
+    <!-- Local hierarchy: recents + categories (Sprint 3 second pass) -->
+    <string name="category_communication">Comunicación</string>
+    <string name="category_productivity">Productividad</string>
+    <string name="category_multimedia">Multimedia</string>
+    <string name="category_news">Noticias</string>
+    <string name="category_maps_travel">Mapas y viajes</string>
+    <string name="category_games">Juegos</string>
+    <string name="category_tools">Herramientas</string>
+    <string name="category_other">Otros</string>
+    <string name="drawer_section_recent">Recientes</string>
+    <string name="drawer_section_categories">Categorías</string>
+    <string name="drawer_section_all_apps">Todas las apps</string>
+    <string name="drawer_back">Atrás</string>
+    <string name="drawer_no_recents">Aún no hay apps recientes</string>
+    <plurals name="category_app_count">
+        <item quantity="one">%d app</item>
+        <item quantity="other">%d apps</item>
+    </plurals>
+
+    <!-- Native Home modules: real device data only, never fabricated -->
+    <string name="battery_label">Batería</string>
+    <string name="battery_charging">Cargando</string>
+    <string name="next_alarm_label">Próxima alarma</string>
+    <string name="next_alarm_none">Sin alarma</string>
+    <string name="home_recent_title">Recientes</string>
+    <string name="home_recent_see_all">Ver todas</string>
+    <string name="action_open_drawer_hint">Abrir todas las apps</string>
+    <string name="action_close_drawer_hint">Cerrar todas las apps</string>
+    <string name="drawer_section_favorites">Favoritos</string>
+    <string name="ivory_hoy_title">Hoy</string>
+    <string name="ivory_tagline">Un día enfocado también es un día pleno.</string>
+    <string name="ember_focus_tagline">Disciplina hoy. Un mejor mañana.</string>
+    <string name="ember_quick_access">ACCESO RÁPIDO</string>
+    <string name="violet_open_action">Abrir</string>
 </resources>

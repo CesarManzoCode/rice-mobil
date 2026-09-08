@@ -1,6 +1,7 @@
 package dev.cesarmanzocode.ricemobile.apps
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherActivityInfo
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
@@ -154,6 +155,12 @@ class AppsRepository(
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?: info.componentName.packageName
+        val appInfo = runCatching { info.applicationInfo }.getOrNull()
+        val isSystemApp = appInfo != null && (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        val category = AppCategory.fromApplicationInfoCategory(
+            category = appInfo?.category ?: ApplicationInfo.CATEGORY_UNDEFINED,
+            isSystemApp = isSystemApp,
+        )
         return AppEntry(
             key = AppKey(userSerial = serial, component = info.componentName.flattenToString()),
             packageName = info.componentName.packageName,
@@ -161,6 +168,7 @@ class AppsRepository(
             normalizedLabel = AppSearch.normalize(label),
             normalizedPackage = AppSearch.normalize(info.componentName.packageName),
             iconRevision = iconRevisions[info.componentName.packageName] ?: 0L,
+            category = category,
         )
     }
 }

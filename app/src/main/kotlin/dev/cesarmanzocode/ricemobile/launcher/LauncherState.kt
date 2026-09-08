@@ -3,13 +3,20 @@ package dev.cesarmanzocode.ricemobile.launcher
 import dev.cesarmanzocode.ricemobile.apps.AppEntry
 import dev.cesarmanzocode.ricemobile.apps.AppKey
 import dev.cesarmanzocode.ricemobile.apps.CatalogStatus
+import dev.cesarmanzocode.ricemobile.rice.FavoriteSlot
 import dev.cesarmanzocode.ricemobile.rice.RiceId
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 
 enum class LauncherScreen { Home, Drawer, RicePicker }
 
 enum class UiMessageType { CatalogRefreshFailed, AppLaunchFailed, FavoriteLimitReached, WallpaperFailed }
 
 data class UiMessage(val id: Long, val type: UiMessageType)
+
+/** A long-press context menu request (UX overhaul §7-9): [anchor] is the pressed item's own
+ * window-relative bounds, captured by [dev.cesarmanzocode.ricemobile.ui.shared.appCellPressable] —
+ * carried through transient state so the menu can render anchored to it instead of "de golpe". */
+data class AppMenuRequest(val key: AppKey, val anchor: ScreenRect)
 
 sealed interface WallpaperStatus {
     data object Idle : WallpaperStatus
@@ -26,7 +33,7 @@ data class TransientState(
     val screen: LauncherScreen = LauncherScreen.Home,
     val query: String = "",
     val isDefaultHome: Boolean = false,
-    val appMenu: AppKey? = null,
+    val appMenu: AppMenuRequest? = null,
     val message: UiMessage? = null,
 )
 
@@ -41,7 +48,11 @@ data class LauncherState(
     val results: List<AppEntry> = emptyList(),
     val favoriteKeys: List<AppKey> = emptyList(),
     val favorites: List<AppEntry> = emptyList(),
-    val appMenu: AppKey? = null,
+    /** Precomputed by the ViewModel (contract perf §5): a rice's Home renders this directly
+     * instead of re-deriving it from [favoriteKeys]/[apps] on every recomposition. */
+    val favoriteSlots: List<FavoriteSlot> = emptyList(),
+    val recentApps: List<AppEntry> = emptyList(),
+    val appMenu: AppMenuRequest? = null,
     val isDefaultHome: Boolean = false,
     val preferencesWritable: Boolean = true,
     val wallpaperStatus: WallpaperStatus = WallpaperStatus.Idle,

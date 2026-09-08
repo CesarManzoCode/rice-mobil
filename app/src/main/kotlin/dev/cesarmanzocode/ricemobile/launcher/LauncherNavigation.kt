@@ -1,6 +1,7 @@
 package dev.cesarmanzocode.ricemobile.launcher
 
 import dev.cesarmanzocode.ricemobile.apps.AppKey
+import dev.cesarmanzocode.ricemobile.ui.shared.ScreenRect
 
 /**
  * Pure navigation/transient-state rules (contract §7), extracted from [LauncherViewModel] so
@@ -32,14 +33,15 @@ object LauncherNavigation {
     fun favoriteLimitReached(state: TransientState, messageId: Long): TransientState =
         state.copy(message = UiMessage(messageId, UiMessageType.FavoriteLimitReached))
 
-    fun showAppMenu(state: TransientState, key: AppKey): TransientState = state.copy(appMenu = key)
+    fun showAppMenu(state: TransientState, key: AppKey, anchor: ScreenRect): TransientState =
+        state.copy(appMenu = AppMenuRequest(key, anchor))
 
     fun dismissAppMenu(state: TransientState): TransientState = state.copy(appMenu = null)
 
     // Back precedence (contract §7): menu closes first, then IME, then Picker/Drawer -> Home,
     // then Home is a no-op only while this app actually holds the Home role.
 
-    fun menuBackHandlerEnabled(appMenu: AppKey?): Boolean = appMenu != null
+    fun menuBackHandlerEnabled(appMenu: AppMenuRequest?): Boolean = appMenu != null
 
     fun imeBackHandlerEnabled(screen: LauncherScreen, imeVisible: Boolean): Boolean =
         screen == LauncherScreen.Drawer && imeVisible
