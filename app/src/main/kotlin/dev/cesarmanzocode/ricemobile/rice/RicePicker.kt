@@ -1,9 +1,13 @@
 package dev.cesarmanzocode.ricemobile.rice
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +19,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,17 +32,25 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.cesarmanzocode.ricemobile.R
+import dev.cesarmanzocode.ricemobile.ui.shared.LocalReducedMotion
 import dev.cesarmanzocode.ricemobile.ui.shared.ricePressable
+import dev.cesarmanzocode.ricemobile.wallpaper.WallpaperBackdrop
+import dev.cesarmanzocode.ricemobile.wallpaper.prefetchWallpaper
+import kotlinx.coroutines.launch
 
-private const val PICKER_PRESS_SCALE = 0.97f
-private const val PICKER_PRESS_MS = 90
-
-private val PICKER_BACKGROUND = Color(0xFF141414)
+private val PICKER_SCRIM = Color(0xB30A0A0A)
 private val PICKER_CHROME = Color(0xFFF5F5F0)
 
 private data class RicePreview(val background: Color, val ink: Color)
@@ -60,27 +77,76 @@ fun RicePicker(
     onSelect: (RiceId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.fillMaxSize().background(PICKER_BACKGROUND).safeDrawingPadding().padding(16.dp),
-    ) {
-        Text(text = stringResource(R.string.rice_picker_title), color = PICKER_CHROME, fontWeight = FontWeight.Medium, fontSize = 18.sp)
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            items(RiceRegistry.all, key = { it.id }) { rice ->
-                RiceOption(rice = rice, selected = rice.id == current, onClick = { onSelect(rice.id) })
+    // UX overhaul §15-17: the background stays a *live* rice surface, not a flat neutral card — the
+    // current rice's own wallpaper, dimmed under a scrim, so the picker reads as "Home receded
+    // behind an overlay" rather than a separate full-screen dialog. Rebuilding the entire Home
+    // composition behind the picker (the literal spec wording) is out of budget for this pass —
+    // this is the documented, honest simplification: same *idea* (background stays alive), smaller
+    // mechanism (a wallpaper layer instead of a full frozen Home frame).
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val scope = rememberCoroutineScope()
+    // Guards a second tap from firing a second prefetch+select while the first selection's exit
+    // transition is already underway — this composable is short-lived (the host disposes it once
+    // the route switch completes) so no reset-on-dismiss is needed.
+    var pendingSelection by remember { mutableStateOf<RiceId?>(null) }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        WallpaperBackdrop(spec = RiceRegistry.of(current).wallpaper, modifier = Modifier.fillMaxSize())
+        Box(modifier = Modifier.fillMaxSize().background(PICKER_SCRIM))
+        Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
+            Text(text = stringResource(R.string.rice_picker_title), color = PICKER_CHROME, fontWeight = FontWeight.Medium, fontSize = 18.sp)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(top = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                items(RiceRegistry.all, key = { it.id }) { rice ->
+                    RiceOption(
+                        rice = rice,
+                        selected = rice.id == current,
+                        expanding = pendingSelection == rice.id,
+                        onClick = {
+                            if (pendingSelection != null) return@RiceOption
+                            pendingSelection = rice.id
+                            // Fire-and-forget (contract §31: no artificial delay before the real
+                            // action) — races the route's own 180ms crossfade so the new Home's
+                            // wallpaper is as likely as possible to already be decoded by the time
+                            // it composes; WallpaperBackdrop's own fallback-to-bitmap fade covers
+                            // the case it loses that race.
+                            scope.launch {
+                                val targetSize = IntSize(
+                                    with(density) { configuration.screenWidthDp.dp.roundToPx() },
+                                    with(density) { configuration.screenHeightDp.dp.roundToPx() },
+                                )
+                                prefetchWallpaper(context, rice.wallpaper, targetSize)
+                            }
+                            onSelect(rice.id)
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RiceOption(rice: Rice, selected: Boolean, onClick: () -> Unit) {
+private fun RiceOption(rice: Rice, selected: Boolean, expanding: Boolean, onClick: () -> Unit) {
     val preview = previewOf(rice.id)
+    val reducedMotion = LocalReducedMotion.current
+    val haptics = LocalHapticFeedback.current
+    // UX overhaul §16-17: the tapped tile visibly "takes" the screen — a small hero scale-up that
+    // plays concurrently with (never blocking) the host's own route crossfade, so the outgoing
+    // frame this rice fades out from is mid-expansion rather than static.
+    val heroScale by animateFloatAsState(
+        targetValue = if (expanding) 1.045f else 1f,
+        animationSpec = if (reducedMotion) snap() else (rice.motion.pressSpec ?: spring(dampingRatio = 0.7f, stiffness = 380f)),
+        label = "picker-hero-scale",
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer { scaleX = heroScale; scaleY = heroScale }
             .clip(RoundedCornerShape(14.dp))
             .background(preview.background)
             .border(
@@ -88,7 +154,15 @@ private fun RiceOption(rice: Rice, selected: Boolean, onClick: () -> Unit) {
                 color = if (selected) preview.ink else preview.ink.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(14.dp),
             )
-            .ricePressable(pressScale = PICKER_PRESS_SCALE, pressMs = PICKER_PRESS_MS, onClick = onClick)
+            .ricePressable(
+                pressScale = rice.motion.pressScale,
+                pressMs = rice.motion.pressMs,
+                pressSpec = rice.motion.pressSpec,
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                },
+            )
             .padding(14.dp),
     ) {
         Canvas(modifier = Modifier.fillMaxWidth().aspectRatio(2f)) {
